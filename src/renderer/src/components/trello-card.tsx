@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { TrelloIcon } from '@/components/icons/TrelloIcon'
@@ -12,6 +14,21 @@ export function TrelloCard({ onOpenConnectDialog }: TrelloCardProps): React.JSX.
   const trelloStatusChecked = useAppStore((s) => s.trelloStatusChecked)
   const disconnectTrello = useAppStore((s) => s.disconnectTrello)
   const testTrelloConnection = useAppStore((s) => s.testTrelloConnection)
+  const [testing, setTesting] = useState(false)
+
+  const handleTestConnection = async (): Promise<void> => {
+    setTesting(true)
+    try {
+      const result = await testTrelloConnection()
+      if (result.ok) {
+        toast.success(`Trello connected as ${result.viewer.displayName || result.viewer.username}`)
+      } else {
+        toast.error(result.error)
+      }
+    } finally {
+      setTesting(false)
+    }
+  }
 
   if (!trelloStatusChecked) {
     return (
@@ -44,7 +61,13 @@ export function TrelloCard({ onOpenConnectDialog }: TrelloCardProps): React.JSX.
         </div>
         {trelloStatus.connected ? (
           <div className="flex shrink-0 items-center gap-1.5">
-            <Button variant="outline" size="sm" onClick={() => void testTrelloConnection()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleTestConnection()}
+              disabled={testing}
+            >
+              {testing ? <LoaderCircle className="size-3.5 mr-1.5 animate-spin" /> : null}
               Test
             </Button>
             <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">

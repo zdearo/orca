@@ -9,7 +9,9 @@ import type {
   TrelloCardFilter,
   TrelloComment,
   TrelloConnectionStatus,
+  TrelloLabel,
   TrelloList,
+  TrelloMember,
   TrelloViewer
 } from '../../../../shared/trello-types'
 import type { CacheEntry } from './github'
@@ -23,6 +25,8 @@ import {
   trelloTestConnection,
   trelloListBoards,
   trelloListLists,
+  trelloListBoardLabels,
+  trelloListBoardMembers,
   trelloAddCardComment,
   trelloCardComments
 } from '@/runtime/runtime-trello-client'
@@ -73,6 +77,8 @@ export type TrelloSlice = {
   trelloBoardsCache: TrelloBoard[] | null
   trelloListsCache: Record<string, TrelloList[]>
   trelloCommentsCache: Record<string, CacheEntry<TrelloComment[]>>
+  trelloBoardMembersCache: Record<string, TrelloMember[]>
+  trelloBoardLabelsCache: Record<string, TrelloLabel[]>
 
   checkTrelloConnection: () => Promise<void>
   connectTrello: (args: {
@@ -84,15 +90,23 @@ export type TrelloSlice = {
   >
   disconnectTrello: () => Promise<void>
   fetchTrelloCard: (cardId: string) => Promise<TrelloCard | null>
-  searchTrelloCards: (query: string, limit?: number, boardIds?: string[]) => Promise<TrelloCard[]>
+  searchTrelloCards: (
+    query: string,
+    limit?: number,
+    boardIds?: string[],
+    options?: { force?: boolean }
+  ) => Promise<TrelloCard[]>
   listTrelloCards: (
     filter?: TrelloCardFilter,
     limit?: number,
-    boardIds?: string[]
+    boardIds?: string[],
+    options?: { force?: boolean }
   ) => Promise<TrelloCard[]>
   fetchTrelloBoards: () => Promise<TrelloBoard[]>
   fetchTrelloLists: (boardId: string) => Promise<TrelloList[]>
-  fetchTrelloComments: (cardId: string) => Promise<TrelloComment[]>
+  fetchTrelloBoardMembers: (boardId: string) => Promise<TrelloMember[]>
+  fetchTrelloBoardLabels: (boardId: string) => Promise<TrelloLabel[]>
+  fetchTrelloComments: (cardId: string, options?: { force?: boolean }) => Promise<TrelloComment[]>
   addTrelloCardComment: (
     cardId: string,
     text: string
@@ -108,6 +122,8 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
   trelloBoardsCache: null,
   trelloListsCache: {},
   trelloCommentsCache: {},
+  trelloBoardMembersCache: {},
+  trelloBoardLabelsCache: {},
 
   checkTrelloConnection: async () => {
     try {
@@ -167,6 +183,8 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
       trelloBoardsCache: null,
       trelloListsCache: {},
       trelloCommentsCache: {},
+      trelloBoardMembersCache: {},
+      trelloBoardLabelsCache: {},
       trelloStatusChecked: true
     })
   },
@@ -204,14 +222,14 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     return promise
   },
 
-  searchTrelloCards: async (query, limit = 30, boardIds) => {
+  searchTrelloCards: async (query, limit = 30, boardIds, options) => {
     const cacheKey = `search::${query}::${limit}::${(boardIds ?? []).join(',')}`
     const cached = get().trelloSearchCache[cacheKey]
-    if (isFresh(cached)) {
+    if (!options?.force && isFresh(cached)) {
       return cached.data ?? []
     }
     const inflight = inflightSearchRequests.get(cacheKey)
-    if (inflight) {
+    if (!options?.force && inflight) {
       return inflight
     }
     const promise = trelloSearchCards(get().settings, query, limit, boardIds)
@@ -238,14 +256,14 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     return promise
   },
 
-  listTrelloCards: async (filter = 'assigned', limit = 30, boardIds) => {
+  listTrelloCards: async (filter = 'assigned', limit = 30, boardIds, options) => {
     const cacheKey = `list::${filter}::${limit}::${(boardIds ?? []).join(',')}`
     const cached = get().trelloSearchCache[cacheKey]
-    if (isFresh(cached)) {
+    if (!options?.force && isFresh(cached)) {
       return cached.data ?? []
     }
     const inflight = inflightListRequests.get(cacheKey)
-    if (inflight) {
+    if (!options?.force && inflight) {
       return inflight
     }
     const promise = trelloListCards(get().settings, filter, limit, boardIds)
@@ -302,9 +320,41 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     }
   },
 
-  fetchTrelloComments: async (cardId) => {
+  fetchTrelloBoardMembers: async (boardId) => {
+    const cached = get().trelloBoardMembersCache[boardId]
+    if (cached) {
+      return cached
+    }
+    try {
+      const members = await trelloListBoardMembers(get().settings, boardId)
+      set((s) => ({
+        trelloBoardMembersCache: { ...s.trelloBoardMembersCache, [boardId]: members }
+      }))
+      return members
+    } catch {
+      return []
+    }
+  },
+
+  fetchTrelloBoardLabels: async (boardId) => {
+    const cached = get().trelloBoardLabelsCache[boardId]
+    if (cached) {
+      return cached
+    }
+    try {
+      const labels = await trelloListBoardLabels(get().settings, boardId)
+      set((s) => ({
+        trelloBoardLabelsCache: { ...s.trelloBoardLabelsCache, [boardId]: labels }
+      }))
+      return labels
+    } catch {
+      return []
+    }
+  },
+
+  fetchTrelloComments: async (cardId, options) => {
     const cached = get().trelloCommentsCache[cardId]
-    if (isFresh(cached)) {
+    if (!options?.force && isFresh(cached)) {
       return cached.data ?? []
     }
     try {

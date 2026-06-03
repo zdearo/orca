@@ -138,6 +138,7 @@ import {
 } from '@/lib/new-workspace'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
+import { buildTrelloCardLinkedWorkItem } from '@/lib/trello-linked-work-item'
 import { isGitRepoKind } from '../../../shared/repo-kind'
 import { getLinearIssueWorkspaceName } from '../../../shared/workspace-name'
 import {
@@ -185,6 +186,7 @@ import type {
   LinearTeam,
   LinearWorkspaceSelection,
   LinearWorkflowState,
+  TrelloCard,
   Repo,
   TaskProvider,
   TaskViewPresetId
@@ -6211,6 +6213,18 @@ export default function TaskPage(): React.JSX.Element {
     [openComposerForJiraItem]
   )
 
+  const handleUseTrelloCard = useCallback(
+    (card: TrelloCard, renderedText?: string): void => {
+      const linkedWorkItem = buildTrelloCardLinkedWorkItem(card, renderedText)
+      openModal('new-workspace-composer', {
+        linkedWorkItem,
+        prefilledName: card.name,
+        telemetrySource: 'sidebar'
+      })
+    },
+    [openModal]
+  )
+
   const handleJiraConnect = useCallback(async (): Promise<void> => {
     const siteUrl = jiraSiteUrlDraft.trim()
     const email = jiraEmailDraft.trim()
@@ -8100,7 +8114,7 @@ export default function TaskPage(): React.JSX.Element {
               </div>
             )
           ) : taskSource === 'trello' ? (
-            <TrelloTaskSourcePanel />
+            <TrelloTaskSourcePanel onUseCard={handleUseTrelloCard} />
           ) : taskSource === 'linear' && selectedLinearIssue ? (
             <LinearIssueWorkspace
               issue={selectedLinearIssue}

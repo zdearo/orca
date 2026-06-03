@@ -332,6 +332,8 @@ import {
   cardComments as getTrelloCardComments,
   createCard as createTrelloCard,
   getCard as getTrelloCard,
+  listBoardLabels as listTrelloBoardLabels,
+  listBoardMembers as listTrelloBoardMembers,
   listBoards as listTrelloBoards,
   listCards as listTrelloCards,
   listLists as listTrelloLists,
@@ -13031,6 +13033,14 @@ export class OrcaRuntimeService {
     return listTrelloLists(boardId)
   }
 
+  trelloListBoardMembers(boardId: string): ReturnType<typeof listTrelloBoardMembers> {
+    return listTrelloBoardMembers(boardId)
+  }
+
+  trelloListBoardLabels(boardId: string): ReturnType<typeof listTrelloBoardLabels> {
+    return listTrelloBoardLabels(boardId)
+  }
+
   trelloListCards(
     filter?: TrelloCardFilter,
     limit = 30,
@@ -13051,16 +13061,41 @@ export class OrcaRuntimeService {
     return getTrelloCard(cardId)
   }
 
-  trelloCreateCard(args: TrelloCreateCardArgs): ReturnType<typeof createTrelloCard> {
-    return createTrelloCard(args)
+  async trelloCreateCard(
+    args: TrelloCreateCardArgs
+  ): Promise<
+    { ok: true; id: string; shortLink: string; url: string } | { ok: false; error: string }
+  > {
+    try {
+      const card = await createTrelloCard(args)
+      return { ok: true, id: card.id, shortLink: card.shortLink, url: card.url }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Create failed.' }
+    }
   }
 
-  trelloUpdateCard(cardId: string, updates: TrelloCardUpdate): ReturnType<typeof updateTrelloCard> {
-    return updateTrelloCard(cardId, updates)
+  async trelloUpdateCard(
+    cardId: string,
+    updates: TrelloCardUpdate
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await updateTrelloCard(cardId, updates)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Update failed.' }
+    }
   }
 
-  trelloAddCardComment(cardId: string, text: string): ReturnType<typeof addTrelloCardComment> {
-    return addTrelloCardComment(cardId, text)
+  async trelloAddCardComment(
+    cardId: string,
+    text: string
+  ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+    try {
+      const comment = await addTrelloCardComment(cardId, text)
+      return { ok: true, id: comment.id }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Comment failed.' }
+    }
   }
 
   trelloCardComments(cardId: string): ReturnType<typeof getTrelloCardComments> {

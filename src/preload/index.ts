@@ -1396,6 +1396,12 @@ const api = {
     listLists: (args: { boardId: string }): Promise<unknown[]> =>
       ipcRenderer.invoke('trello:listLists', args),
 
+    listBoardMembers: (args: { boardId: string }): Promise<unknown[]> =>
+      ipcRenderer.invoke('trello:listBoardMembers', args),
+
+    listBoardLabels: (args: { boardId: string }): Promise<unknown[]> =>
+      ipcRenderer.invoke('trello:listBoardLabels', args),
+
     listCards: (args?: {
       filter?: 'assigned' | 'allOpen' | 'archived'
       limit?: number

@@ -50,7 +50,9 @@ const UpdateCard = z.object({
     name: OptionalString,
     desc: OptionalString,
     idList: z.union([z.string(), z.null()]).optional(),
-    closed: z.boolean().optional()
+    closed: z.boolean().optional(),
+    idMembers: z.array(z.string()).optional(),
+    idLabels: z.array(z.string()).optional()
   })
 })
 
@@ -93,6 +95,16 @@ export const TRELLO_METHODS: RpcMethod[] = [
     name: 'trello.listLists',
     params: BoardId,
     handler: async (params, { runtime }) => runtime.trelloListLists(params.boardId.trim())
+  }),
+  defineMethod({
+    name: 'trello.listBoardMembers',
+    params: BoardId,
+    handler: async (params, { runtime }) => runtime.trelloListBoardMembers(params.boardId.trim())
+  }),
+  defineMethod({
+    name: 'trello.listBoardLabels',
+    params: BoardId,
+    handler: async (params, { runtime }) => runtime.trelloListBoardLabels(params.boardId.trim())
   }),
   defineMethod({
     name: 'trello.listCards',

@@ -15,6 +15,15 @@ function toStringOrNull(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
+function normalizeTrelloAvatarUrl(value: unknown): string | null {
+  const url = toStringOrNull(value)
+  if (!url) {
+    return null
+  }
+  // Trello member avatarUrl is often an extensionless base URL; browsers need a concrete image.
+  return /\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i.test(url) ? url : `${url}/50.png`
+}
+
 function toBool(value: unknown): boolean {
   return value === true
 }
@@ -42,7 +51,7 @@ export function mapTrelloList(data: Record<string, unknown>): TrelloList {
   }
 }
 
-function mapTrelloLabel(data: unknown): TrelloLabel {
+export function mapTrelloLabel(data: unknown): TrelloLabel {
   if (!data || typeof data !== 'object') {
     return { id: '', name: '', color: null }
   }
@@ -54,7 +63,7 @@ function mapTrelloLabel(data: unknown): TrelloLabel {
   }
 }
 
-function mapTrelloMember(data: unknown): TrelloMember {
+export function mapTrelloMember(data: unknown): TrelloMember {
   if (!data || typeof data !== 'object') {
     return { id: '', username: '', fullName: '' }
   }
@@ -63,7 +72,7 @@ function mapTrelloMember(data: unknown): TrelloMember {
     id: toStringOrEmpty(record.id),
     username: toStringOrEmpty(record.username),
     fullName: toStringOrEmpty(record.fullName),
-    avatarUrl: toStringOrNull(record.avatarUrl)
+    avatarUrl: normalizeTrelloAvatarUrl(record.avatarUrl)
   }
 }
 
@@ -95,11 +104,24 @@ export function mapTrelloCard(data: Record<string, unknown>): TrelloCard {
   }
 }
 
+function getTrelloCommentText(
+  actionData: Record<string, unknown> | null,
+  data: Record<string, unknown>
+): string {
+  const textData = actionData ? nestedRecord(actionData.textData) : null
+  const display = nestedRecord(data.display)
+  const entities = display ? nestedRecord(display.entities) : null
+  const comment = entities ? nestedRecord(entities.comment) : null
+  return toStringOrEmpty(actionData?.text ?? textData?.text ?? comment?.text ?? data.text)
+}
+
 export function mapTrelloComment(data: Record<string, unknown>): TrelloComment {
-  const memberCreator = data.memberCreator as Record<string, unknown> | undefined
+  const actionData = nestedRecord(data.data)
+  const memberCreator = nestedRecord(data.memberCreator)
   return {
     id: toStringOrEmpty(data.id),
-    text: toStringOrEmpty(data.text),
+    // Trello commentCard actions may store text under data.text or data.textData.text.
+    text: getTrelloCommentText(actionData, data),
     date: toStringOrEmpty(data.date),
     dateLastEdited: toStringOrNull(data.dateLastEdited),
     memberCreator: memberCreator ? mapTrelloMember(memberCreator) : undefined

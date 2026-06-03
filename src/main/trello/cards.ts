@@ -3,12 +3,21 @@ import type {
   TrelloBoard,
   TrelloCard,
   TrelloCardFilter,
+  TrelloCardUpdate,
   TrelloComment,
   TrelloCreateCardArgs,
+  TrelloLabel,
   TrelloList,
-  TrelloCardUpdate
+  TrelloMember
 } from '../../shared/trello-types'
-import { mapTrelloCard, mapTrelloComment, mapTrelloBoard, mapTrelloList } from './mappers'
+import {
+  mapTrelloBoard,
+  mapTrelloCard,
+  mapTrelloComment,
+  mapTrelloLabel,
+  mapTrelloList,
+  mapTrelloMember
+} from './mappers'
 
 export async function listBoards(): Promise<TrelloBoard[]> {
   await acquire()
@@ -29,6 +38,30 @@ export async function listLists(boardId: string): Promise<TrelloList[]> {
       `/boards/${boardId}/lists?fields=name,idBoard,pos,closed`
     )
     return data.map(mapTrelloList)
+  } finally {
+    release()
+  }
+}
+
+export async function listBoardMembers(boardId: string): Promise<TrelloMember[]> {
+  await acquire()
+  try {
+    const data = await trelloRequest<Record<string, unknown>[]>(
+      `/boards/${boardId}/members?fields=username,fullName,avatarUrl`
+    )
+    return data.map(mapTrelloMember)
+  } finally {
+    release()
+  }
+}
+
+export async function listBoardLabels(boardId: string): Promise<TrelloLabel[]> {
+  await acquire()
+  try {
+    const data = await trelloRequest<Record<string, unknown>[]>(
+      `/boards/${boardId}/labels?fields=name,color`
+    )
+    return data.map(mapTrelloLabel)
   } finally {
     release()
   }
@@ -140,6 +173,12 @@ export async function updateCard(
     }
     if (updates.closed !== undefined) {
       body.closed = updates.closed
+    }
+    if (updates.idMembers !== undefined) {
+      body.idMembers = updates.idMembers.join(',')
+    }
+    if (updates.idLabels !== undefined) {
+      body.idLabels = updates.idLabels.join(',')
     }
     const data = await trelloRequest<Record<string, unknown>>(`/cards/${cardId}`, {
       method: 'PUT',

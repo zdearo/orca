@@ -91,7 +91,9 @@ import type {
   TrelloComment,
   TrelloConnectionStatus,
   TrelloCreateCardArgs,
+  TrelloLabel,
   TrelloList,
+  TrelloMember,
   TrelloViewer,
   LinearViewer,
   LinearCollectionResult,
@@ -1512,6 +1514,8 @@ export type PreloadApi = {
     testConnection: () => Promise<{ ok: true; viewer: TrelloViewer } | { ok: false; error: string }>
     listBoards: () => Promise<TrelloBoard[]>
     listLists: (args: { boardId: string }) => Promise<TrelloList[]>
+    listBoardMembers: (args: { boardId: string }) => Promise<TrelloMember[]>
+    listBoardLabels: (args: { boardId: string }) => Promise<TrelloLabel[]>
     listCards: (args?: {
       filter?: TrelloCardFilter
       limit?: number

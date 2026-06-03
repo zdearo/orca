@@ -7,7 +7,9 @@ import type {
   TrelloComment,
   TrelloConnectionStatus,
   TrelloCreateCardArgs,
+  TrelloLabel,
   TrelloList,
+  TrelloMember,
   TrelloViewer
 } from '../../../shared/types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
@@ -78,6 +80,36 @@ export async function trelloListLists(
   return target.kind === 'environment'
     ? callRuntimeRpc<TrelloList[]>(target, 'trello.listLists', { boardId }, { timeoutMs: 30_000 })
     : window.api.trello.listLists({ boardId })
+}
+
+export async function trelloListBoardMembers(
+  settings: RuntimeTrelloSettings,
+  boardId: string
+): Promise<TrelloMember[]> {
+  const target = getActiveRuntimeTarget(settings)
+  return target.kind === 'environment'
+    ? callRuntimeRpc<TrelloMember[]>(
+        target,
+        'trello.listBoardMembers',
+        { boardId },
+        { timeoutMs: 30_000 }
+      )
+    : window.api.trello.listBoardMembers({ boardId })
+}
+
+export async function trelloListBoardLabels(
+  settings: RuntimeTrelloSettings,
+  boardId: string
+): Promise<TrelloLabel[]> {
+  const target = getActiveRuntimeTarget(settings)
+  return target.kind === 'environment'
+    ? callRuntimeRpc<TrelloLabel[]>(
+        target,
+        'trello.listBoardLabels',
+        { boardId },
+        { timeoutMs: 30_000 }
+      )
+    : window.api.trello.listBoardLabels({ boardId })
 }
 
 export async function trelloListCards(

@@ -73,6 +73,8 @@ export type TrelloCardUpdate = {
   desc?: string
   idList?: string | null
   closed?: boolean
+  idMembers?: string[]
+  idLabels?: string[]
 }
 
 export type TrelloConnectArgs = {

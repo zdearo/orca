@@ -3,6 +3,8 @@ import { connect, disconnect, getStatus, testConnection } from '../trello/client
 import {
   listBoards,
   listLists,
+  listBoardLabels,
+  listBoardMembers,
   listCards,
   searchCards,
   getCard,
@@ -49,6 +51,18 @@ function normalizeCardUpdate(value: unknown): TrelloCardUpdate | null {
   if (input.closed !== undefined && typeof input.closed !== 'boolean') {
     return null
   }
+  if (input.idMembers !== undefined && !Array.isArray(input.idMembers)) {
+    return null
+  }
+  if (input.idMembers?.some((id) => typeof id !== 'string')) {
+    return null
+  }
+  if (input.idLabels !== undefined && !Array.isArray(input.idLabels)) {
+    return null
+  }
+  if (input.idLabels?.some((id) => typeof id !== 'string')) {
+    return null
+  }
   return input
 }
 
@@ -84,6 +98,20 @@ export function registerTrelloHandlers(): void {
       return []
     }
     return listLists(args.boardId.trim())
+  })
+
+  ipcMain.handle('trello:listBoardMembers', async (_event, args: { boardId: string }) => {
+    if (typeof args?.boardId !== 'string' || !args.boardId.trim()) {
+      return []
+    }
+    return listBoardMembers(args.boardId.trim())
+  })
+
+  ipcMain.handle('trello:listBoardLabels', async (_event, args: { boardId: string }) => {
+    if (typeof args?.boardId !== 'string' || !args.boardId.trim()) {
+      return []
+    }
+    return listBoardLabels(args.boardId.trim())
   })
 
   ipcMain.handle(
