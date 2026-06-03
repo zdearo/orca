@@ -28,6 +28,20 @@ import type {
 export type { WorkspaceSource as WorkspaceCreateTelemetrySource } from './workspace-source'
 export type { TaskProvider } from './task-providers'
 export type {
+  TrelloBoard,
+  TrelloCard,
+  TrelloCardFilter,
+  TrelloCardUpdate,
+  TrelloComment,
+  TrelloConnectArgs,
+  TrelloConnectionStatus,
+  TrelloCreateCardArgs,
+  TrelloLabel,
+  TrelloList,
+  TrelloMember,
+  TrelloViewer
+} from './trello-types'
+export type {
   GitBranchChangeStatus,
   GitConflictKind,
   GitConflictOperation,
@@ -248,6 +262,8 @@ export type Worktree = {
   // to typecheck and load without migration.
   linkedGitLabMR?: number | null
   linkedGitLabIssue?: number | null
+  /** Optional Trello card shortLink or id. Absent for older worktrees. */
+  linkedTrelloCard?: string | null
   isArchived: boolean
   isUnread: boolean
   isPinned: boolean
@@ -310,6 +326,8 @@ export type WorktreeMeta = {
   linkedGitLabMR?: number | null
   /** Optional for backward compatibility — see Worktree.linkedGitLabIssue. */
   linkedGitLabIssue?: number | null
+  /** Optional Trello card shortLink or id. See Worktree.linkedTrelloCard. */
+  linkedTrelloCard?: string | null
   isArchived: boolean
   isUnread: boolean
   isPinned: boolean
@@ -1587,6 +1605,7 @@ export type CreateWorktreeArgs = {
   linkedLinearIssue?: string
   linkedGitLabIssue?: number
   linkedGitLabMR?: number
+  linkedTrelloCard?: string
   pushTarget?: GitPushTarget
   workspaceStatus?: WorkspaceStatus
   manualOrder?: number
@@ -2147,6 +2166,9 @@ export type GlobalSettings = {
   /** Why: one-shot migration guard so Jira becomes visible for existing
    *  profiles once, without re-adding it after a later deliberate opt-out. */
   visibleTaskProvidersDefaultedForJira: boolean
+  /** Why: one-shot migration guard so Trello becomes visible for existing
+   *  profiles once, without re-adding it after a later deliberate opt-out. */
+  visibleTaskProvidersDefaultedForTrello?: boolean
   /** Why: persists the user's repo selection in the cross-repo tasks view.
    *  `null` means sticky-all — every eligible repo is selected, including
    *  repos added in future sessions, so the "All repos" label stays

@@ -508,6 +508,7 @@ function mergeFolderWorkspace(repo: Repo, worktreeId: string, meta: WorktreeMeta
     linkedLinearIssue: meta.linkedLinearIssue ?? null,
     linkedGitLabMR: meta.linkedGitLabMR ?? null,
     linkedGitLabIssue: meta.linkedGitLabIssue ?? null,
+    ...(meta.linkedTrelloCard !== undefined ? { linkedTrelloCard: meta.linkedTrelloCard } : {}),
     isArchived: meta.isArchived ?? false,
     isUnread: meta.isUnread ?? false,
     isPinned: meta.isPinned ?? false,
@@ -598,6 +599,7 @@ function createFolderWorkspace(
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
+    ...(args.linkedTrelloCard !== undefined ? { linkedTrelloCard: args.linkedTrelloCard } : {}),
     ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {})
   })
   return { worktree: mergeFolderWorkspace(repo, worktreeId, meta) }

@@ -292,6 +292,7 @@ export function mergeWorktree(
     linkedLinearIssue: meta?.linkedLinearIssue ?? null,
     linkedGitLabMR: meta?.linkedGitLabMR ?? null,
     linkedGitLabIssue: meta?.linkedGitLabIssue ?? null,
+    ...(meta?.linkedTrelloCard !== undefined ? { linkedTrelloCard: meta.linkedTrelloCard } : {}),
     isArchived: meta?.isArchived ?? false,
     isUnread: meta?.isUnread ?? false,
     isPinned: meta?.isPinned ?? false,

@@ -59,6 +59,10 @@ import type {
   JiraIssueFilter,
   JiraIssueUpdate,
   JiraSiteSelection,
+  TrelloCardFilter,
+  TrelloCardUpdate,
+  TrelloConnectArgs,
+  TrelloCreateCardArgs,
   LinearIssueUpdate,
   LinearWorkspaceSelection,
   NestedRepoScanResult,
@@ -317,6 +321,23 @@ import {
   searchIssues as searchJiraIssues,
   updateIssue as updateJiraIssue
 } from '../jira/issues'
+import {
+  connect as connectTrello,
+  disconnect as disconnectTrello,
+  getStatus as getTrelloStatus,
+  testConnection as testTrelloConnection
+} from '../trello/client'
+import {
+  addCardComment as addTrelloCardComment,
+  cardComments as getTrelloCardComments,
+  createCard as createTrelloCard,
+  getCard as getTrelloCard,
+  listBoards as listTrelloBoards,
+  listCards as listTrelloCards,
+  listLists as listTrelloLists,
+  searchCards as searchTrelloCards,
+  updateCard as updateTrelloCard
+} from '../trello/cards'
 import {
   clearProjectItemFieldValue,
   getProjectViewTable,
@@ -907,6 +928,7 @@ function mergeRuntimeFolderWorkspace(repo: Repo, worktreeId: string, meta: Workt
     linkedLinearIssue: meta.linkedLinearIssue ?? null,
     linkedGitLabMR: meta.linkedGitLabMR ?? null,
     linkedGitLabIssue: meta.linkedGitLabIssue ?? null,
+    ...(meta.linkedTrelloCard !== undefined ? { linkedTrelloCard: meta.linkedTrelloCard } : {}),
     isArchived: meta.isArchived ?? false,
     isUnread: meta.isUnread ?? false,
     isPinned: meta.isPinned ?? false,
@@ -7805,6 +7827,7 @@ export class OrcaRuntimeService {
     linkedLinearIssue?: string
     linkedGitLabMR?: number | null
     linkedGitLabIssue?: number | null
+    linkedTrelloCard?: string
     comment?: string
     displayName?: string
     telemetrySource?: WorkspaceCreateTelemetrySource
@@ -7886,6 +7909,7 @@ export class OrcaRuntimeService {
           ? { linkedGitLabIssue: args.linkedGitLabIssue }
           : {}),
         ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
+        ...(args.linkedTrelloCard !== undefined ? { linkedTrelloCard: args.linkedTrelloCard } : {}),
         ...(effectiveCreatedWithAgent ? { createdWithAgent: effectiveCreatedWithAgent } : {}),
         ...(args.comment !== undefined ? { comment: args.comment } : {}),
         ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
@@ -8219,6 +8243,7 @@ export class OrcaRuntimeService {
       ...(args.linkedGitLabIssue !== undefined
         ? { linkedGitLabIssue: args.linkedGitLabIssue }
         : {}),
+      ...(args.linkedTrelloCard !== undefined ? { linkedTrelloCard: args.linkedTrelloCard } : {}),
       ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
       ...(effectiveCreatedWithAgent ? { createdWithAgent: effectiveCreatedWithAgent } : {}),
       ...(args.pendingFirstAgentMessageRename === true && effectiveCreatedWithAgent
@@ -8462,6 +8487,7 @@ export class OrcaRuntimeService {
       linkedLinearIssue?: string
       linkedGitLabMR?: number | null
       linkedGitLabIssue?: number | null
+      linkedTrelloCard?: string
       comment?: string
       displayName?: string
       workspaceStatus?: string
@@ -12962,7 +12988,6 @@ export class OrcaRuntimeService {
   ): ReturnType<typeof listJiraCreateFields> {
     return listJiraCreateFields(projectIdOrKey, issueTypeId, siteId)
   }
-
   jiraListPriorities(siteId?: string): ReturnType<typeof listJiraPriorities> {
     return listJiraPriorities(siteId)
   }
@@ -12977,6 +13002,69 @@ export class OrcaRuntimeService {
 
   jiraListTransitions(key: string, siteId?: string): ReturnType<typeof listJiraTransitions> {
     return listJiraTransitions(key, siteId)
+  }
+
+  // ── Trello integration ──
+
+  trelloConnect(args: TrelloConnectArgs): ReturnType<typeof connectTrello> {
+    return connectTrello(args)
+  }
+
+  trelloDisconnect(): { ok: true } {
+    disconnectTrello()
+    return { ok: true }
+  }
+
+  trelloStatus(): ReturnType<typeof getTrelloStatus> {
+    return getTrelloStatus()
+  }
+
+  trelloTestConnection(): ReturnType<typeof testTrelloConnection> {
+    return testTrelloConnection()
+  }
+
+  trelloListBoards(): ReturnType<typeof listTrelloBoards> {
+    return listTrelloBoards()
+  }
+
+  trelloListLists(boardId: string): ReturnType<typeof listTrelloLists> {
+    return listTrelloLists(boardId)
+  }
+
+  trelloListCards(
+    filter?: TrelloCardFilter,
+    limit = 30,
+    boardIds?: string[]
+  ): ReturnType<typeof listTrelloCards> {
+    return listTrelloCards(filter, Math.min(Math.max(1, limit), 100), boardIds)
+  }
+
+  trelloSearchCards(
+    query: string,
+    limit = 30,
+    boardIds?: string[]
+  ): ReturnType<typeof searchTrelloCards> {
+    return searchTrelloCards(query, Math.min(Math.max(1, limit), 100), boardIds)
+  }
+
+  trelloGetCard(cardId: string): ReturnType<typeof getTrelloCard> {
+    return getTrelloCard(cardId)
+  }
+
+  trelloCreateCard(args: TrelloCreateCardArgs): ReturnType<typeof createTrelloCard> {
+    return createTrelloCard(args)
+  }
+
+  trelloUpdateCard(cardId: string, updates: TrelloCardUpdate): ReturnType<typeof updateTrelloCard> {
+    return updateTrelloCard(cardId, updates)
+  }
+
+  trelloAddCardComment(cardId: string, text: string): ReturnType<typeof addTrelloCardComment> {
+    return addTrelloCardComment(cardId, text)
+  }
+
+  trelloCardComments(cardId: string): ReturnType<typeof getTrelloCardComments> {
+    return getTrelloCardComments(cardId)
   }
 
   // ── Browser automation ──

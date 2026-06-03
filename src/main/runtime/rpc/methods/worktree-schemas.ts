@@ -61,6 +61,7 @@ export const WorktreeCreate = z
     linkedLinearIssue: z.string().optional(),
     linkedGitLabMR: TriStateLinkedIssue,
     linkedGitLabIssue: TriStateLinkedIssue,
+    linkedTrelloCard: OptionalString,
     comment: OptionalString,
     displayName: OptionalString,
     telemetrySource: z
@@ -154,6 +155,7 @@ export const WorktreeSet = WorktreeSelector.extend({
   linkedPR: TriStateLinkedIssue,
   linkedLinearIssue: z.union([z.string(), z.null()]).optional(),
   linkedGitLabMR: TriStateLinkedIssue,
+  linkedTrelloCard: z.union([z.string(), z.null()]).optional(),
   linkedGitLabIssue: TriStateLinkedIssue,
   isArchived: OptionalBoolean,
   isUnread: OptionalBoolean,

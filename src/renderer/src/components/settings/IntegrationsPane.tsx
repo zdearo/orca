@@ -24,6 +24,8 @@ import {
   type PreflightRefreshProvider
 } from './integrations-pane-status'
 export { INTEGRATIONS_PANE_SEARCH_ENTRIES } from './integrations-search'
+import { TrelloCard } from '@/components/trello-card'
+import { TrelloConnectDialog } from '@/components/trello-connect-dialog'
 
 function LinearIcon({ className }: { className?: string }): React.JSX.Element {
   return (
@@ -41,6 +43,7 @@ export function IntegrationsPane(): React.JSX.Element {
   const checkLinearConnection = useAppStore((s) => s.checkLinearConnection)
   const refreshPreflightStatus = useAppStore((s) => s.refreshPreflightStatus)
   const testLinearConnection = useAppStore((s) => s.testLinearConnection)
+  const checkTrelloConnection = useAppStore((s) => s.checkTrelloConnection)
   const linearWorkspaces = linearStatus.workspaces ?? []
   const mountedRef = useMountedRef()
 
@@ -52,11 +55,13 @@ export function IntegrationsPane(): React.JSX.Element {
   const [linearTestResultByWorkspace, setLinearTestResultByWorkspace] = useState<
     Record<string, { state: 'ok' | 'error'; error?: string }>
   >({})
+  const [trelloDialogOpen, setTrelloDialogOpen] = useState(false)
 
   useEffect(() => {
     void checkLinearConnection()
+    void checkTrelloConnection()
     void refreshPreflightStatus()
-  }, [checkLinearConnection, refreshPreflightStatus])
+  }, [checkLinearConnection, checkTrelloConnection, refreshPreflightStatus])
 
   const {
     ghStatus,
@@ -640,6 +645,11 @@ export function IntegrationsPane(): React.JSX.Element {
           </div>
         )}
       </div>
+
+      {/* Trello */}
+      <TrelloCard onOpenConnectDialog={() => setTrelloDialogOpen(true)} />
+
+      <TrelloConnectDialog open={trelloDialogOpen} onOpenChange={setTrelloDialogOpen} />
 
       <LinearApiKeyDialog
         open={linearDialogOpen}

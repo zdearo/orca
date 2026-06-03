@@ -30,5 +30,19 @@ export const INTEGRATIONS_PANE_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     title: 'Linear Integration',
     description: 'Connect Linear to browse and link issues.',
     keywords: ['linear', 'integration', 'api key', 'connect', 'disconnect']
+  },
+  {
+    title: 'Trello Integration',
+    description: 'Connect Trello to browse and link cards.',
+    keywords: [
+      'trello',
+      'integration',
+      'api key',
+      'connect',
+      'disconnect',
+      'card',
+      'board',
+      'atlassian'
+    ]
   }
 ]

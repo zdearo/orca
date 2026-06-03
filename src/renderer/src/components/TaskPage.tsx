@@ -127,6 +127,8 @@ import {
 } from '@/components/linear-project-view-surfaces'
 import JiraIssueWorkspace from '@/components/JiraIssueWorkspace'
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import { TrelloIcon } from '@/components/icons/TrelloIcon'
+import { TrelloTaskSourcePanel } from '@/components/trello-task-source-panel'
 import { cn } from '@/lib/utils'
 import {
   getLinkedWorkItemSuggestedName,
@@ -304,6 +306,11 @@ const SOURCE_OPTIONS: SourceOption[] = [
     id: 'jira',
     label: 'Jira',
     Icon: ({ className }) => <JiraIcon className={className} />
+  },
+  {
+    id: 'trello',
+    label: 'Trello',
+    Icon: ({ className }) => <TrelloIcon className={className} />
   }
 ]
 
@@ -2485,6 +2492,8 @@ export default function TaskPage(): React.JSX.Element {
   const searchJiraIssues = useAppStore((s) => s.searchJiraIssues)
   const listJiraIssues = useAppStore((s) => s.listJiraIssues)
   const checkJiraConnection = useAppStore((s) => s.checkJiraConnection)
+  const trelloStatusChecked = useAppStore((s) => s.trelloStatusChecked)
+  const checkTrelloConnection = useAppStore((s) => s.checkTrelloConnection)
   const submitShortcutLabel = getScreenSubmitShortcutLabel()
   const eligibleRepos = useMemo(() => repos.filter((repo) => isGitRepoKind(repo)), [repos])
 
@@ -5525,13 +5534,18 @@ export default function TaskPage(): React.JSX.Element {
     if (!jiraStatusChecked) {
       void checkJiraConnection()
     }
+    if (!trelloStatusChecked) {
+      void checkTrelloConnection()
+    }
   }, [
     checkJiraConnection,
     checkLinearConnection,
+    checkTrelloConnection,
     jiraStatusChecked,
     linearStatusChecked,
     preflightStatusChecked,
-    refreshPreflightStatus
+    refreshPreflightStatus,
+    trelloStatusChecked
   ])
 
   // Why: debounce the Linear search input so we don't fire a request on every
@@ -8085,6 +8099,8 @@ export default function TaskPage(): React.JSX.Element {
                 />
               </div>
             )
+          ) : taskSource === 'trello' ? (
+            <TrelloTaskSourcePanel />
           ) : taskSource === 'linear' && selectedLinearIssue ? (
             <LinearIssueWorkspace
               issue={selectedLinearIssue}

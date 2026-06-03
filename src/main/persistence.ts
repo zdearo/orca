@@ -1732,8 +1732,15 @@ export class Store {
           : rawTaskProviderSettings.visibleTaskProviders.includes('jira')
             ? rawTaskProviderSettings.visibleTaskProviders
             : [...rawTaskProviderSettings.visibleTaskProviders, 'jira' as const]
+        const visibleTaskProvidersDefaultedForTrello =
+          parsed.settings?.visibleTaskProvidersDefaultedForTrello === true
+        const migratedVisibleTaskProvidersWithTrello = visibleTaskProvidersDefaultedForTrello
+          ? migratedVisibleTaskProviders
+          : migratedVisibleTaskProviders.includes('trello')
+            ? migratedVisibleTaskProviders
+            : [...migratedVisibleTaskProviders, 'trello' as const]
         const taskProviderSettings = normalizeTaskProviderSettings({
-          visibleTaskProviders: migratedVisibleTaskProviders,
+          visibleTaskProviders: migratedVisibleTaskProvidersWithTrello,
           defaultTaskSource: rawTaskProviderSettings.defaultTaskSource
         })
         const primarySelectionDefaultedForLinux =
@@ -1753,6 +1760,9 @@ export class Store {
           this.loadNeedsSave = true
         }
         if (!visibleTaskProvidersDefaultedForJira) {
+          this.loadNeedsSave = true
+        }
+        if (!visibleTaskProvidersDefaultedForTrello) {
           this.loadNeedsSave = true
         }
         result = {
@@ -1794,6 +1804,7 @@ export class Store {
             defaultTaskSource: taskProviderSettings.defaultTaskSource,
             visibleTaskProviders: taskProviderSettings.visibleTaskProviders,
             visibleTaskProvidersDefaultedForJira: true,
+            visibleTaskProvidersDefaultedForTrello: true,
             terminalShortcutPolicy: normalizeTerminalShortcutPolicy(
               parsed.settings?.terminalShortcutPolicy
             ),
@@ -2933,6 +2944,9 @@ export class Store {
       if ('visibleTaskProviders' in updates) {
         sanitizedUpdates.visibleTaskProvidersDefaultedForJira = true
       }
+      if ('visibleTaskProviders' in updates) {
+        sanitizedUpdates.visibleTaskProvidersDefaultedForTrello = true
+      }
     }
     if ('openInApplications' in updates) {
       sanitizedUpdates.openInApplications = normalizeOpenInApplications(updates.openInApplications)
@@ -3774,6 +3788,7 @@ function getDefaultWorktreeMeta(): WorktreeMeta {
     linkedLinearIssue: null,
     linkedGitLabMR: null,
     linkedGitLabIssue: null,
+    linkedTrelloCard: undefined,
     isArchived: false,
     isUnread: false,
     isPinned: false,

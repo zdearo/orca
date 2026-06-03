@@ -84,6 +84,15 @@ import type {
   JiraTransition,
   JiraUser,
   JiraViewer,
+  TrelloBoard,
+  TrelloCard,
+  TrelloCardFilter,
+  TrelloCardUpdate,
+  TrelloComment,
+  TrelloConnectionStatus,
+  TrelloCreateCardArgs,
+  TrelloList,
+  TrelloViewer,
   LinearViewer,
   LinearCollectionResult,
   LinearConnectionStatus,
@@ -1492,6 +1501,42 @@ export type PreloadApi = {
       siteId?: string
     }) => Promise<JiraUser[]>
     listTransitions: (args: { key: string; siteId?: string }) => Promise<JiraTransition[]>
+  }
+  trello: {
+    connect: (args: {
+      apiKey: string
+      token: string
+    }) => Promise<{ ok: true; viewer: TrelloViewer } | { ok: false; error: string }>
+    disconnect: () => Promise<void>
+    status: () => Promise<TrelloConnectionStatus>
+    testConnection: () => Promise<{ ok: true; viewer: TrelloViewer } | { ok: false; error: string }>
+    listBoards: () => Promise<TrelloBoard[]>
+    listLists: (args: { boardId: string }) => Promise<TrelloList[]>
+    listCards: (args?: {
+      filter?: TrelloCardFilter
+      limit?: number
+      boardIds?: string[]
+    }) => Promise<TrelloCard[]>
+    searchCards: (args: {
+      query: string
+      limit?: number
+      boardIds?: string[]
+    }) => Promise<TrelloCard[]>
+    getCard: (args: { cardId: string }) => Promise<TrelloCard | null>
+    createCard: (
+      args: TrelloCreateCardArgs
+    ) => Promise<
+      { ok: true; id: string; shortLink: string; url: string } | { ok: false; error: string }
+    >
+    updateCard: (args: {
+      cardId: string
+      updates: TrelloCardUpdate
+    }) => Promise<{ ok: true } | { ok: false; error: string }>
+    addCardComment: (args: {
+      cardId: string
+      text: string
+    }) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
+    cardComments: (args: { cardId: string }) => Promise<TrelloComment[]>
   }
   starNag: {
     onShow: (callback: () => void) => () => void

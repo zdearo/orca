@@ -12,6 +12,7 @@ export const TASKS_PANE_SEARCH_ENTRIES: SettingsSearchEntry[] = [
       'gitlab',
       'linear',
       'jira',
+      'trello',
       'atlassian',
       'display',
       'hide'
