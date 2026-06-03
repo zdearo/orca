@@ -1,5 +1,6 @@
 import type {
   GlobalSettings,
+  TrelloAttachment,
   TrelloBoard,
   TrelloCard,
   TrelloCardFilter,
@@ -7,6 +8,8 @@ import type {
   TrelloComment,
   TrelloConnectionStatus,
   TrelloCreateCardArgs,
+  TrelloImageDownloadResult,
+  TrelloUploadAttachmentArgs,
   TrelloLabel,
   TrelloList,
   TrelloMember,
@@ -207,4 +210,34 @@ export async function trelloCardComments(
         { timeoutMs: 30_000 }
       )
     : window.api.trello.cardComments({ cardId })
+}
+
+export async function trelloUploadAttachment(
+  settings: RuntimeTrelloSettings,
+  args: TrelloUploadAttachmentArgs
+): Promise<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }> {
+  const target = getActiveRuntimeTarget(settings)
+  return target.kind === 'environment'
+    ? callRuntimeRpc<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }>(
+        target,
+        'trello.uploadAttachment',
+        args,
+        { timeoutMs: 60_000 }
+      )
+    : window.api.trello.uploadAttachment(args)
+}
+
+export async function trelloDownloadImage(
+  settings: RuntimeTrelloSettings,
+  url: string
+): Promise<TrelloImageDownloadResult> {
+  const target = getActiveRuntimeTarget(settings)
+  return target.kind === 'environment'
+    ? callRuntimeRpc<TrelloImageDownloadResult>(
+        target,
+        'trello.downloadImage',
+        { url },
+        { timeoutMs: 30_000 }
+      )
+    : window.api.trello.downloadImage({ url })
 }

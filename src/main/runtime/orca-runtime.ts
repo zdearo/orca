@@ -59,10 +59,12 @@ import type {
   JiraIssueFilter,
   JiraIssueUpdate,
   JiraSiteSelection,
+  TrelloAttachment,
   TrelloCardFilter,
   TrelloCardUpdate,
   TrelloConnectArgs,
   TrelloCreateCardArgs,
+  TrelloUploadAttachmentArgs,
   LinearIssueUpdate,
   LinearWorkspaceSelection,
   NestedRepoScanResult,
@@ -325,7 +327,8 @@ import {
   connect as connectTrello,
   disconnect as disconnectTrello,
   getStatus as getTrelloStatus,
-  testConnection as testTrelloConnection
+  testConnection as testTrelloConnection,
+  trelloDownload
 } from '../trello/client'
 import {
   addCardComment as addTrelloCardComment,
@@ -338,6 +341,7 @@ import {
   listCards as listTrelloCards,
   listLists as listTrelloLists,
   searchCards as searchTrelloCards,
+  uploadCardAttachment as uploadTrelloCardAttachment,
   updateCard as updateTrelloCard
 } from '../trello/cards'
 import {
@@ -13100,6 +13104,36 @@ export class OrcaRuntimeService {
 
   trelloCardComments(cardId: string): ReturnType<typeof getTrelloCardComments> {
     return getTrelloCardComments(cardId)
+  }
+
+  async trelloUploadAttachment(
+    args: TrelloUploadAttachmentArgs
+  ): Promise<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }> {
+    try {
+      const attachment = await uploadTrelloCardAttachment(args)
+      return { ok: true, attachment }
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Attachment upload failed.'
+      }
+    }
+  }
+
+  async trelloDownloadImage(
+    url: string
+  ): Promise<
+    { ok: true; contentType: string; contentBase64: string } | { ok: false; error: string }
+  > {
+    try {
+      const result = await trelloDownload(url)
+      return { ok: true, ...result }
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Image download failed.'
+      }
+    }
   }
 
   // ── Browser automation ──

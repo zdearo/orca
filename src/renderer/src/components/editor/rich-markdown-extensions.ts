@@ -27,11 +27,14 @@ import { DragSelectionGuard } from './drag-selection-guard'
 import { createRichMarkdownAnnotationHighlightExtension } from './rich-markdown-annotation-highlight'
 
 const lowlight = createLowlight(common)
+export type RichMarkdownImageSrcResolver = (src: string) => Promise<string | null | undefined>
 
 export function createRichMarkdownExtensions({
-  includePlaceholder = false
+  includePlaceholder = false,
+  resolveImageSrc
 }: {
   includePlaceholder?: boolean
+  resolveImageSrc?: RichMarkdownImageSrcResolver
 } = {}): AnyExtension[] {
   const extensions: AnyExtension[] = [
     // Why: rich-mode detection must use the exact same markdown extension set as
@@ -87,6 +90,31 @@ export function createRichMarkdownExtensions({
             const runtimeContext = this.storage.runtimeContext as
               | RuntimeFileOperationArgs
               | undefined
+            if (src && resolveImageSrc) {
+              void resolveImageSrc(src).then((resolved) => {
+                if (currentSrc !== src) {
+                  return
+                }
+                if (resolved !== undefined) {
+                  if (resolved) {
+                    img.src = resolved
+                  } else {
+                    img.removeAttribute('src')
+                  }
+                  return
+                }
+                loadDefaultImage(src, fp, runtimeContext)
+              })
+              return
+            }
+            loadDefaultImage(src, fp, runtimeContext)
+          }
+
+          const loadDefaultImage = (
+            src: string | undefined,
+            fp: string,
+            runtimeContext: RuntimeFileOperationArgs | undefined
+          ): void => {
             if (src && fp) {
               void loadLocalImageSrc(src, fp, undefined, runtimeContext).then((resolved) => {
                 if (currentSrc !== src) {

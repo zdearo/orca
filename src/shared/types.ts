@@ -28,6 +28,7 @@ import type {
 export type { WorkspaceSource as WorkspaceCreateTelemetrySource } from './workspace-source'
 export type { TaskProvider } from './task-providers'
 export type {
+  TrelloAttachment,
   TrelloBoard,
   TrelloCard,
   TrelloCardFilter,
@@ -36,7 +37,9 @@ export type {
   TrelloConnectArgs,
   TrelloConnectionStatus,
   TrelloCreateCardArgs,
+  TrelloImageDownloadResult,
   TrelloLabel,
+  TrelloUploadAttachmentArgs,
   TrelloList,
   TrelloMember,
   TrelloViewer

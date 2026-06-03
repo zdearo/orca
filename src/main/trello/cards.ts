@@ -1,16 +1,19 @@
 import { trelloRequest, acquire, release } from './client'
 import type {
+  TrelloAttachment,
   TrelloBoard,
   TrelloCard,
   TrelloCardFilter,
   TrelloCardUpdate,
   TrelloComment,
   TrelloCreateCardArgs,
+  TrelloUploadAttachmentArgs,
   TrelloLabel,
   TrelloList,
   TrelloMember
 } from '../../shared/trello-types'
 import {
+  mapTrelloAttachment,
   mapTrelloBoard,
   mapTrelloCard,
   mapTrelloComment,
@@ -150,6 +153,30 @@ export async function createCard(args: TrelloCreateCardArgs): Promise<TrelloCard
       body: JSON.stringify(body)
     })
     return mapTrelloCard(data)
+  } finally {
+    release()
+  }
+}
+
+export async function uploadCardAttachment(
+  args: TrelloUploadAttachmentArgs
+): Promise<TrelloAttachment> {
+  await acquire()
+  try {
+    const form = new FormData()
+    const bytes = Buffer.from(args.contentBase64, 'base64')
+    const content = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    form.set('file', new Blob([content], { type: args.mimeType }), args.name)
+    form.set('name', args.name)
+    form.set('mimeType', args.mimeType)
+    const data = await trelloRequest<Record<string, unknown>>(
+      `/cards/${encodeURIComponent(args.cardId)}/attachments`,
+      {
+        method: 'POST',
+        body: form
+      }
+    )
+    return mapTrelloAttachment(data)
   } finally {
     release()
   }

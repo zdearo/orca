@@ -88,3 +88,29 @@ export type TrelloCreateCardArgs = {
   name: string
   desc?: string
 }
+
+export type TrelloAttachment = {
+  id: string
+  name: string
+  fileName: string
+  mimeType: string
+  url: string
+}
+
+export type TrelloUploadAttachmentArgs = {
+  cardId: string
+  name: string
+  mimeType: string
+  contentBase64: string
+}
+
+export type TrelloImageDownloadResult =
+  | {
+      ok: true
+      contentType: string
+      contentBase64: string
+    }
+  | {
+      ok: false
+      error: string
+    }

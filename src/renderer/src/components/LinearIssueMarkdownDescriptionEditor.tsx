@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/react'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -18,7 +18,10 @@ import {
   Strikethrough
 } from 'lucide-react'
 
-import { createRichMarkdownExtensions } from '@/components/editor/rich-markdown-extensions'
+import {
+  createRichMarkdownExtensions,
+  type RichMarkdownImageSrcResolver
+} from '@/components/editor/rich-markdown-extensions'
 import { encodeRawMarkdownHtmlForRichEditor } from '@/components/editor/raw-markdown-html'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
@@ -31,6 +34,7 @@ type LinearIssueMarkdownDescriptionEditorProps = {
   density: 'page' | 'drawer'
   disabled: boolean
   submitShortcutLabel: string
+  resolveImageSrc?: RichMarkdownImageSrcResolver
 }
 
 type LinearIssueMarkdownToolbarButtonProps = {
@@ -40,13 +44,6 @@ type LinearIssueMarkdownToolbarButtonProps = {
   onClick: () => void
   children: React.ReactNode
 }
-
-const linearIssueMarkdownExtensions = [
-  ...createRichMarkdownExtensions(),
-  Placeholder.configure({
-    placeholder: 'No description provided.'
-  })
-]
 
 function LinearIssueMarkdownToolbarButton({
   active = false,
@@ -244,14 +241,25 @@ export function LinearIssueMarkdownDescriptionEditor({
   onSave,
   density,
   disabled,
-  submitShortcutLabel
+  submitShortcutLabel,
+  resolveImageSrc
 }: LinearIssueMarkdownDescriptionEditorProps): React.JSX.Element {
   const lastEditorMarkdownRef = useRef(value)
   const editorRef = useRef<Editor | null>(null)
 
+  const extensions = useMemo(
+    () => [
+      ...createRichMarkdownExtensions({ resolveImageSrc }),
+      Placeholder.configure({
+        placeholder: 'No description provided.'
+      })
+    ],
+    [resolveImageSrc]
+  )
+
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: linearIssueMarkdownExtensions,
+    extensions,
     content: encodeRawMarkdownHtmlForRichEditor(value),
     contentType: 'markdown',
     editable: !disabled,

@@ -1439,7 +1439,32 @@ const api = {
       ipcRenderer.invoke('trello:addCardComment', args),
 
     cardComments: (args: { cardId: string }): Promise<unknown[]> =>
-      ipcRenderer.invoke('trello:cardComments', args)
+      ipcRenderer.invoke('trello:cardComments', args),
+
+    uploadAttachment: (args: {
+      cardId: string
+      name: string
+      mimeType: string
+      contentBase64: string
+    }): Promise<
+      | {
+          ok: true
+          attachment: {
+            id: string
+            name: string
+            fileName: string
+            mimeType: string
+            url: string
+          }
+        }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('trello:uploadAttachment', args),
+
+    downloadImage: (args: {
+      url: string
+    }): Promise<
+      { ok: true; contentType: string; contentBase64: string } | { ok: false; error: string }
+    > => ipcRenderer.invoke('trello:downloadImage', args)
   },
 
   starNag: {

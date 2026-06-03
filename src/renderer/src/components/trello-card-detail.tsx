@@ -18,6 +18,8 @@ import { TrelloCardDetailHeader } from '@/components/trello-card-detail-header'
 import type { TrelloCardDetailActionItem } from '@/components/trello-card-detail-sidebar'
 import { TrelloCardDetailSidebar } from '@/components/trello-card-detail-sidebar'
 import { renderCardContext } from '@/components/trello-card-detail-text'
+import { createTrelloImageSrcResolver } from '@/lib/trello-authenticated-images'
+import { prepareTrelloDescriptionForSave } from '@/lib/trello-description-images'
 
 type TrelloCardDetailProps = {
   card: TrelloCard
@@ -65,12 +67,9 @@ export function TrelloCardDetail({
   const [saving, setSaving] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [error, setError] = useState<string | null>(null)
-
   const [commentsError, setCommentsError] = useState<string | null>(null)
-  const selectedList = useMemo(
-    () => lists.find((list) => list.id === listId) ?? null,
-    [listId, lists]
-  )
+
+  const resolveTrelloImageSrc = useMemo(() => createTrelloImageSrcResolver(settings), [settings])
 
   const dirty = useMemo(
     () => title !== displayed.name || description !== displayed.desc || listId !== displayed.idList,
@@ -135,27 +134,32 @@ export function TrelloCardDetail({
     onUpdated(updated)
   }
 
+  const saveCardChanges = async (nextDescription: string): Promise<TrelloCard | null> => {
+    const preparedDescription = await prepareTrelloDescriptionForSave({
+      cardId: displayed.id,
+      description: nextDescription,
+      settings
+    })
+    const updated = await trelloUpdateCard(settings, displayed.id, {
+      name: title.trim(),
+      desc: preparedDescription,
+      idList: listId
+    })
+    if (!updated.ok) {
+      throw new Error(updated.error)
+    }
+    return fetchTrelloCard(displayed.id)
+  }
+
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     setError(null)
     try {
-      const result = await trelloUpdateCard(settings, displayed.id, {
-        name: title.trim(),
-        desc: description,
-        idList: listId
-      })
-      if (!result.ok) {
-        setError(result.error)
-        return
+      const updatedCard = await saveCardChanges(description)
+      if (updatedCard) {
+        applyUpdatedCard(updatedCard)
+        toast.success('Trello card updated')
       }
-      applyUpdatedCard({
-        ...displayed,
-        name: title.trim(),
-        desc: description,
-        idList: listId,
-        listName: selectedList?.name ?? displayed.listName
-      })
-      toast.success('Trello card updated')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update Trello card.')
     } finally {
@@ -170,12 +174,22 @@ export function TrelloCardDetail({
     setSaving(true)
     setError(null)
     try {
-      const result = await trelloUpdateCard(settings, displayed.id, { desc: nextDescription })
+      const preparedDescription = await prepareTrelloDescriptionForSave({
+        cardId: displayed.id,
+        description: nextDescription,
+        settings
+      })
+      const result = await trelloUpdateCard(settings, displayed.id, { desc: preparedDescription })
       if (!result.ok) {
         setError(result.error)
         return
       }
-      applyUpdatedCard({ ...displayed, desc: nextDescription })
+      const updatedCard = await fetchTrelloCard(displayed.id)
+      if (updatedCard) {
+        applyUpdatedCard(updatedCard)
+      } else {
+        applyUpdatedCard({ ...displayed, desc: preparedDescription })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update Trello description.')
     } finally {
@@ -345,6 +359,7 @@ export function TrelloCardDetail({
                 density="page"
                 disabled={saving}
                 submitShortcutLabel={getScreenSubmitShortcutLabel()}
+                resolveImageSrc={resolveTrelloImageSrc}
               />
               <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-4">
                 <Button size="sm" onClick={() => void handleSave()} disabled={!dirty || saving}>

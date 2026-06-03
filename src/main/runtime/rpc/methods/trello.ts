@@ -23,6 +23,17 @@ const CardId = z.object({
   cardId: requiredString('Card ID is required')
 })
 
+const ImageUrl = z.object({
+  url: requiredString('Image URL is required')
+})
+
+const UploadAttachment = z.object({
+  cardId: requiredString('Card ID is required'),
+  name: requiredString('Attachment name is required'),
+  mimeType: requiredString('Attachment MIME type is required'),
+  contentBase64: requiredString('Attachment content is required')
+})
+
 const ListCards = z
   .object({
     filter: z.enum(VALID_FILTERS).optional(),
@@ -150,5 +161,21 @@ export const TRELLO_METHODS: RpcMethod[] = [
     name: 'trello.cardComments',
     params: CardId,
     handler: async (params, { runtime }) => runtime.trelloCardComments(params.cardId.trim())
+  }),
+  defineMethod({
+    name: 'trello.uploadAttachment',
+    params: UploadAttachment,
+    handler: async (params, { runtime }) =>
+      runtime.trelloUploadAttachment({
+        cardId: params.cardId.trim(),
+        name: params.name.trim(),
+        mimeType: params.mimeType.trim(),
+        contentBase64: params.contentBase64.trim()
+      })
+  }),
+  defineMethod({
+    name: 'trello.downloadImage',
+    params: ImageUrl,
+    handler: async (params, { runtime }) => runtime.trelloDownloadImage(params.url.trim())
   })
 ]

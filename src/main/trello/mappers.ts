@@ -1,4 +1,5 @@
 import type {
+  TrelloAttachment,
   TrelloBoard,
   TrelloCard,
   TrelloComment,
@@ -78,6 +79,16 @@ export function mapTrelloMember(data: unknown): TrelloMember {
 
 function nestedRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+export function mapTrelloAttachment(data: Record<string, unknown>): TrelloAttachment {
+  return {
+    id: toStringOrEmpty(data.id),
+    name: toStringOrEmpty(data.name),
+    fileName: toStringOrEmpty(data.fileName),
+    mimeType: toStringOrEmpty(data.mimeType),
+    url: toStringOrEmpty(data.url)
+  }
 }
 
 export function mapTrelloCard(data: Record<string, unknown>): TrelloCard {

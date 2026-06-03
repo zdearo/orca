@@ -84,6 +84,7 @@ import type {
   JiraTransition,
   JiraUser,
   JiraViewer,
+  TrelloAttachment,
   TrelloBoard,
   TrelloCard,
   TrelloCardFilter,
@@ -91,9 +92,11 @@ import type {
   TrelloComment,
   TrelloConnectionStatus,
   TrelloCreateCardArgs,
+  TrelloImageDownloadResult,
   TrelloLabel,
   TrelloList,
   TrelloMember,
+  TrelloUploadAttachmentArgs,
   TrelloViewer,
   LinearViewer,
   LinearCollectionResult,
@@ -1541,6 +1544,10 @@ export type PreloadApi = {
       text: string
     }) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
     cardComments: (args: { cardId: string }) => Promise<TrelloComment[]>
+    uploadAttachment: (
+      args: TrelloUploadAttachmentArgs
+    ) => Promise<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }>
+    downloadImage: (args: { url: string }) => Promise<TrelloImageDownloadResult>
   }
   starNag: {
     onShow: (callback: () => void) => () => void

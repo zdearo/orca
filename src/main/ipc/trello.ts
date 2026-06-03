@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { connect, disconnect, getStatus, testConnection } from '../trello/client'
+import { connect, disconnect, getStatus, testConnection, trelloDownload } from '../trello/client'
 import {
   listBoards,
   listLists,
@@ -11,13 +11,15 @@ import {
   createCard,
   updateCard,
   addCardComment,
-  cardComments
+  cardComments,
+  uploadCardAttachment
 } from '../trello/cards'
 import type {
   TrelloCardFilter,
   TrelloCardUpdate,
   TrelloConnectArgs,
-  TrelloCreateCardArgs
+  TrelloCreateCardArgs,
+  TrelloUploadAttachmentArgs
 } from '../../shared/trello-types'
 
 const VALID_FILTERS = new Set<TrelloCardFilter>(['assigned', 'allOpen', 'archived'])
@@ -217,5 +219,49 @@ export function registerTrelloHandlers(): void {
       return []
     }
     return cardComments(args.cardId.trim())
+  })
+
+  ipcMain.handle('trello:uploadAttachment', async (_event, args: TrelloUploadAttachmentArgs) => {
+    if (typeof args?.cardId !== 'string' || !args.cardId.trim()) {
+      return { ok: false as const, error: 'Card ID is required.' }
+    }
+    if (typeof args?.name !== 'string' || !args.name.trim()) {
+      return { ok: false as const, error: 'Attachment name is required.' }
+    }
+    if (typeof args?.mimeType !== 'string' || !args.mimeType.startsWith('image/')) {
+      return { ok: false as const, error: 'Only image attachments are supported.' }
+    }
+    if (typeof args?.contentBase64 !== 'string' || !args.contentBase64.trim()) {
+      return { ok: false as const, error: 'Attachment content is required.' }
+    }
+    try {
+      const attachment = await uploadCardAttachment({
+        cardId: args.cardId.trim(),
+        name: args.name.trim(),
+        mimeType: args.mimeType,
+        contentBase64: args.contentBase64
+      })
+      return { ok: true as const, attachment }
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : 'Attachment upload failed.'
+      }
+    }
+  })
+
+  ipcMain.handle('trello:downloadImage', async (_event, args: { url: string }) => {
+    if (typeof args?.url !== 'string' || !args.url.trim()) {
+      return { ok: false as const, error: 'Image URL is required.' }
+    }
+    try {
+      const result = await trelloDownload(args.url.trim())
+      return { ok: true as const, ...result }
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : 'Image download failed.'
+      }
+    }
   })
 }
