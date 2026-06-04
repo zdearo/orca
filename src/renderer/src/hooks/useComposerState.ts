@@ -1800,13 +1800,15 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         ? 'linear'
         : provider === 'jira'
           ? 'jira'
-          : provider === 'gitlab'
-            ? linkedWorkItem.type === 'mr'
-              ? 'gitlab-mr'
-              : 'gitlab-issue'
-            : linkedWorkItem.type === 'pr'
-              ? 'github-pr'
-              : 'github-issue'
+          : provider === 'trello'
+            ? 'trello'
+            : provider === 'gitlab'
+              ? linkedWorkItem.type === 'mr'
+                ? 'gitlab-mr'
+                : 'gitlab-issue'
+              : linkedWorkItem.type === 'pr'
+                ? 'github-pr'
+                : 'github-issue'
       return {
         kind,
         label:

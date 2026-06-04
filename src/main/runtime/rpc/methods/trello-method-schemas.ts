@@ -13,7 +13,7 @@ export const TRELLO_DOWNLOAD_CHUNK_BASE64_CHARS = 512 * 1024
 const VALID_UPLOAD_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
 
-function isValidBase64(value: string): boolean {
+export function isValidBase64(value: string): boolean {
   return value.length % 4 !== 1 && BASE64_PATTERN.test(value)
 }
 
@@ -141,7 +141,11 @@ export const StartDownload = z.object({
 export const ReadDownloadChunk = z.object({
   downloadId: z.string().min(1),
   offset: z.number().int().nonnegative(),
-  length: z.number().int().positive()
+  length: z
+    .number()
+    .int()
+    .positive()
+    .max(TRELLO_DOWNLOAD_CHUNK_BASE64_CHARS, 'Trello download chunk exceeds maximum allowed size')
 })
 
 export const AbortDownload = z.object({

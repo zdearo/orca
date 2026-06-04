@@ -84,11 +84,11 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     const status = await trelloStatus(get().settings)
     set({
       ...createInitialTrelloState(),
+      trelloCacheGeneration: get().trelloCacheGeneration + 1,
       trelloStatus: status.connected ? status : { connected: false, viewer: null },
       trelloStatusChecked: true
     })
   },
-
   fetchTrelloCard: async (cardId, options) => {
     const cached = get().trelloCardCache[cardId]
     if (!options?.force && isFresh(cached)) {
@@ -100,8 +100,12 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
         return inflight
       }
     }
+    const gen = get().trelloCacheGeneration
     const promise = trelloGetCard(get().settings, cardId)
       .then((card) => {
+        if (get().trelloCacheGeneration !== gen) {
+          return card
+        }
         set((s) => ({
           trelloCardCache: evictStaleEntries({
             ...s.trelloCardCache,
@@ -115,7 +119,7 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
         if (looksLikeAuthError(error)) {
           set({ trelloStatus: { connected: false, viewer: null } })
         }
-        return null
+        throw error
       })
       .finally(() => {
         inflightCardRequests.delete(cardId)
@@ -134,8 +138,12 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     if (!options?.force && inflight) {
       return inflight
     }
+    const gen = get().trelloCacheGeneration
     const promise = trelloSearchCards(get().settings, query, limit, boardIds)
       .then((cards) => {
+        if (get().trelloCacheGeneration !== gen) {
+          return cards
+        }
         set((s) => ({
           trelloSearchCache: evictStaleEntries({
             ...s.trelloSearchCache,
@@ -149,7 +157,7 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
         if (looksLikeAuthError(error)) {
           set({ trelloStatus: { connected: false, viewer: null } })
         }
-        return []
+        throw error
       })
       .finally(() => {
         inflightSearchRequests.delete(cacheKey)
@@ -168,8 +176,12 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     if (!options?.force && inflight) {
       return inflight
     }
+    const gen = get().trelloCacheGeneration
     const promise = trelloListCards(get().settings, filter, limit, boardIds)
       .then((cards) => {
+        if (get().trelloCacheGeneration !== gen) {
+          return cards
+        }
         set((s) => ({
           trelloSearchCache: evictStaleEntries({
             ...s.trelloSearchCache,
@@ -183,7 +195,7 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
         if (looksLikeAuthError(error)) {
           set({ trelloStatus: { connected: false, viewer: null } })
         }
-        return []
+        throw error
       })
       .finally(() => {
         inflightListRequests.delete(cacheKey)
@@ -206,30 +218,36 @@ export const createTrelloSlice: StateCreator<AppState, [], [], TrelloSlice> = (s
     if (options?.force) {
       // Let a new request proceed even if one is in flight
     }
+    const gen = get().trelloCacheGeneration
     const comments = await trelloCardComments(get().settings, cardId)
-    set((s) => ({
-      trelloCommentsCache: {
-        ...s.trelloCommentsCache,
-        [cardId]: { data: comments, fetchedAt: Date.now() }
-      }
-    }))
+    if (get().trelloCacheGeneration === gen) {
+      set((s) => ({
+        trelloCommentsCache: {
+          ...s.trelloCommentsCache,
+          [cardId]: { data: comments, fetchedAt: Date.now() }
+        }
+      }))
+    }
     return comments
   },
 
   addTrelloCardComment: async (cardId, text) => {
+    const gen = get().trelloCacheGeneration
     try {
       const result = await trelloAddCardComment(get().settings, cardId, text)
       if (result.ok) {
         // Invalidate comments cache and force-refresh so the caller
         // doesn't read stale data on the next render.
-        set((s) => {
-          const next = { ...s.trelloCommentsCache }
-          delete next[cardId]
-          return { trelloCommentsCache: next }
-        })
-        // Trigger an async forced refresh — fire-and-forget; errors
-        // surface via the comments cache/error state.
-        void get().fetchTrelloComments(cardId, { force: true })
+        if (get().trelloCacheGeneration === gen) {
+          set((s) => {
+            const next = { ...s.trelloCommentsCache }
+            delete next[cardId]
+            return { trelloCommentsCache: next }
+          })
+          // Trigger an async forced refresh — fire-and-forget; errors
+          // surface via the comments cache/error state.
+          void get().fetchTrelloComments(cardId, { force: true })
+        }
       }
       return result
     } catch (error) {

@@ -323,6 +323,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
       clearTrelloInflight()
       set((s) => ({
         ...runtimeScopedStateReset(),
+        trelloCacheGeneration: (s.trelloCacheGeneration ?? 0) + 1,
         settings:
           (nextSettings as GlobalSettings | undefined) ??
           (s.settings ? { ...s.settings, activeRuntimeEnvironmentId: nextId } : null)

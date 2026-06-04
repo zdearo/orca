@@ -101,6 +101,7 @@ export async function listCards(
       )
       allCards.push(...data.map(mapTrelloCard))
     }
+    allCards.sort((a, b) => (b.dateLastActivity || '').localeCompare(a.dateLastActivity || ''))
     return allCards.slice(0, limit)
   } finally {
     release()

@@ -14,6 +14,10 @@ const mockTrelloGetCard = vi.fn()
 const mockTrelloCardComments = vi.fn()
 const mockTrelloAddCardComment = vi.fn()
 const mockTrelloStatus = vi.fn()
+const mockTrelloListBoards = vi.fn()
+const mockTrelloListLists = vi.fn()
+const mockTrelloListBoardMembers = vi.fn()
+const mockTrelloListBoardLabels = vi.fn()
 
 vi.mock('@/runtime/runtime-trello-client', () => ({
   trelloGetCard: (...args: unknown[]) => mockTrelloGetCard(...args),
@@ -25,13 +29,14 @@ vi.mock('@/runtime/runtime-trello-client', () => ({
   trelloConnect: vi.fn(),
   trelloDisconnect: vi.fn(),
   trelloTestConnection: vi.fn(),
-  trelloListBoards: vi.fn(),
-  trelloListLists: vi.fn(),
-  trelloListBoardMembers: vi.fn(),
-  trelloListBoardLabels: vi.fn()
+  trelloListBoards: (...args: unknown[]) => mockTrelloListBoards(...args),
+  trelloListLists: (...args: unknown[]) => mockTrelloListLists(...args),
+  trelloListBoardMembers: (...args: unknown[]) => mockTrelloListBoardMembers(...args),
+  trelloListBoardLabels: (...args: unknown[]) => mockTrelloListBoardLabels(...args)
 }))
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
+vi.mock('@/lib/trello-authenticated-images', () => ({ clearTrelloImageCache: vi.fn() }))
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 function card(id: string, overrides?: Partial<TrelloCard>): TrelloCard {
@@ -343,6 +348,116 @@ describe('trello store', () => {
 
       // Clean up the hanging promise
       resolveHanging(card('c1'))
+    })
+  })
+  describe('stale response guard (cache generation)', () => {
+    it('discards cache writes from fetchTrelloCard after generation bump', async () => {
+      const store = createTestStore()
+      // Start a slow fetch
+      let resolveFetch!: (v: TrelloCard) => void
+      mockTrelloGetCard.mockReturnValueOnce(
+        new Promise<TrelloCard>((r) => {
+          resolveFetch = r
+        })
+      )
+      const promise = store.getState().fetchTrelloCard('c1')
+
+      // Simulate runtime switch: bump generation and reset caches
+      store.setState({
+        ...createInitialTrelloState(),
+        trelloCacheGeneration: store.getState().trelloCacheGeneration + 1
+      })
+
+      // Old fetch resolves — cache should NOT be repopulated
+      resolveFetch(card('c1', { name: 'Stale from old runtime' }))
+      await promise
+
+      expect(store.getState().trelloCardCache['c1']).toBeUndefined()
+    })
+
+    it('discards cache writes from searchTrelloCards after generation bump', async () => {
+      const store = createTestStore()
+      let resolveSearch!: (v: TrelloCard[]) => void
+      mockTrelloGetCard.mockReturnValueOnce(
+        new Promise<TrelloCard[]>((r) => {
+          resolveSearch = r
+        })
+      )
+      const promise = store.getState().searchTrelloCards('query')
+
+      store.setState({
+        ...createInitialTrelloState(),
+        trelloCacheGeneration: store.getState().trelloCacheGeneration + 1
+      })
+
+      resolveSearch([card('c1')])
+      await promise
+
+      expect(Object.keys(store.getState().trelloSearchCache)).toHaveLength(0)
+    })
+
+    it('discards cache writes from reference data after generation bump', async () => {
+      const store = createTestStore()
+      let resolveBoards!: (v: unknown[]) => void
+      mockTrelloListBoards.mockReturnValueOnce(
+        new Promise((r) => {
+          resolveBoards = r
+        })
+      )
+      const promise = store.getState().fetchTrelloBoards()
+
+      store.setState({
+        ...createInitialTrelloState(),
+        trelloCacheGeneration: store.getState().trelloCacheGeneration + 1
+      })
+
+      resolveBoards([{ id: 'b1', name: 'Stale' }])
+      await promise
+
+      expect(store.getState().trelloBoardsCache).toBeNull()
+    })
+  })
+
+  describe('error propagation', () => {
+    it('fetchTrelloCard rejects instead of returning null', async () => {
+      const store = createTestStore()
+      mockTrelloGetCard.mockRejectedValueOnce(new Error('Network timeout'))
+      await expect(store.getState().fetchTrelloCard('c1')).rejects.toThrow('Network timeout')
+    })
+
+    it('fetchTrelloCard updates auth status on 401 then rejects', async () => {
+      const store = createTestStore()
+      store.setState({
+        trelloStatus: { connected: true, viewer: { id: 'u1', username: 'me', displayName: 'Me' } }
+      })
+      mockTrelloGetCard.mockRejectedValueOnce(new Error('Unauthorized 401'))
+
+      await expect(store.getState().fetchTrelloCard('c1')).rejects.toThrow('Unauthorized 401')
+      expect(store.getState().trelloStatus.connected).toBe(false)
+    })
+
+    it('searchTrelloCards rejects instead of returning empty array', async () => {
+      const store = createTestStore()
+      mockTrelloGetCard.mockRejectedValueOnce(new Error('Server error'))
+      await expect(store.getState().searchTrelloCards('query')).rejects.toThrow('Server error')
+    })
+
+    it('listTrelloCards rejects instead of returning empty array', async () => {
+      const store = createTestStore()
+      mockTrelloGetCard.mockRejectedValueOnce(new Error('Server error'))
+      await expect(store.getState().listTrelloCards()).rejects.toThrow('Server error')
+    })
+
+    it('fetchTrelloBoards rejects instead of returning empty array', async () => {
+      const store = createTestStore()
+      mockTrelloListBoards.mockRejectedValueOnce(new Error('Server error'))
+      await expect(store.getState().fetchTrelloBoards()).rejects.toThrow('Server error')
+    })
+
+    it('fetchTrelloLists rejects instead of returning empty array', async () => {
+      const store = createTestStore()
+      mockTrelloListLists.mockRejectedValueOnce(new Error('Server error'))
+      await expect(store.getState().fetchTrelloLists('b1')).rejects.toThrow('Server error')
     })
   })
 })

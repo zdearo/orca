@@ -25,6 +25,7 @@ type TrelloTaskSourceCardViewsProps = {
   groupedCards: TrelloCardGroup[]
   boardNameById: Map<string, string>
   listNameById: Map<string, string>
+  truncated: boolean
   onSelectCard: (card: TrelloCard) => void
   onUseCard: (card: TrelloCard, renderedText?: string) => void
 }
@@ -58,6 +59,7 @@ export function TrelloTaskSourceCardViews({
   groupedCards,
   boardNameById,
   listNameById,
+  truncated,
   onSelectCard,
   onUseCard
 }: TrelloTaskSourceCardViewsProps): React.JSX.Element {
@@ -75,6 +77,7 @@ export function TrelloTaskSourceCardViews({
     )
   }
 
+  let content: React.JSX.Element
   if (viewMode === 'board') {
     if (selectedBoardId === 'all') {
       return (
@@ -83,24 +86,34 @@ export function TrelloTaskSourceCardViews({
         </div>
       )
     }
-
-    return (
+    content = (
       <TrelloBoardCardView
         boardLists={boardLists}
         cardsByListId={cardsByListId}
         onSelectCard={onSelectCard}
       />
     )
+  } else {
+    content = (
+      <TrelloGroupedCardList
+        groupedCards={groupedCards}
+        boardNameById={boardNameById}
+        listNameById={listNameById}
+        onSelectCard={onSelectCard}
+        onUseCard={onUseCard}
+      />
+    )
   }
 
   return (
-    <TrelloGroupedCardList
-      groupedCards={groupedCards}
-      boardNameById={boardNameById}
-      listNameById={listNameById}
-      onSelectCard={onSelectCard}
-      onUseCard={onUseCard}
-    />
+    <>
+      {content}
+      {truncated && (
+        <div className="border-t border-border/50 px-3 py-2.5 text-center text-[11px] text-muted-foreground/70">
+          Showing the first 50 results. Use the search or filter to narrow results.
+        </div>
+      )}
+    </>
   )
 }
 

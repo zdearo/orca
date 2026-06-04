@@ -5,7 +5,7 @@ import type { TrelloCardDetailActionItem } from '@/components/trello-card-detail
 
 export async function copyTrelloCardDetailText(text: string, label: string): Promise<void> {
   try {
-    await navigator.clipboard.writeText(text)
+    await window.api.ui.writeClipboardText(text)
     toast.success(`${label} copied`)
   } catch {
     toast.error(`Failed to copy ${label.toLowerCase()}`)
@@ -25,7 +25,11 @@ export function createTrelloCardDetailActionItems(
     {
       label: 'Copy short link',
       icon: Clipboard,
-      action: () => void copyTrelloCardDetailText(card.shortLink || card.id, 'Short link')
+      action: () =>
+        void copyTrelloCardDetailText(
+          card.shortUrl || `https://trello.com/c/${card.shortLink || card.id}`,
+          'Short link'
+        )
     },
     {
       label: 'Copy prompt',

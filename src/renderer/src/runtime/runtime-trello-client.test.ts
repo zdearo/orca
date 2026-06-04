@@ -197,6 +197,40 @@ describe('runtime trello client', () => {
       const calls = mockCallRuntimeRpc.mock.calls.map((c: unknown[]) => c[1])
       expect(calls).toContain('trello.abortUpload')
     })
+    it('trims cardId and name before sending to runtime', async () => {
+      mockGetActiveRuntimeTarget.mockReturnValue({ kind: 'environment', environmentId: 'env-1' })
+      mockCallRuntimeRpc
+        .mockResolvedValueOnce({ uploadId: 'upload-1' }) // startUpload
+        .mockResolvedValueOnce({ receivedBase64Length: 4 }) // appendUploadChunk
+        .mockResolvedValueOnce({
+          ok: true,
+          attachment: {
+            id: 'att-1',
+            name: 'test.png',
+            fileName: 'test.png',
+            mimeType: 'image/png',
+            url: 'https://trello.com/att'
+          }
+        })
+
+      await trelloUploadAttachment(
+        { activeRuntimeEnvironmentId: 'env-1' },
+        {
+          cardId: '  card-1  ',
+          name: '  test.png  ',
+          mimeType: 'image/png',
+          contentBase64: 'AAAA'
+        }
+      )
+
+      const startCall = mockCallRuntimeRpc.mock.calls[0]
+      expect(startCall[2]).toEqual({
+        cardId: 'card-1',
+        name: 'test.png',
+        mimeType: 'image/png',
+        expectedBase64Length: 4
+      })
+    })
   })
 
   describe('remote download uses chunked transfer', () => {

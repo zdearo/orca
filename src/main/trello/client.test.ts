@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as CredentialsModule from './credentials'
-import { trelloDownload, trelloRequest, TrelloApiError, isAuthError } from './client'
+import { getStatus, trelloDownload, trelloRequest, TrelloApiError, isAuthError } from './client'
 
 vi.mock('electron', () => ({
   safeStorage: {
@@ -22,7 +22,7 @@ vi.mock('./credentials', () => ({
   updateTrelloViewer: vi.fn()
 }))
 
-const { deleteTrelloCredentials } = await import('./credentials')
+const { deleteTrelloCredentials, loadTrelloToken } = await import('./credentials')
 
 describe('Trello client downloads', () => {
   beforeEach(() => {
@@ -243,28 +243,50 @@ describe('isAuthError', () => {
   })
 })
 
+describe('getStatus', () => {
+  it('reports disconnected when token is not readable', () => {
+    vi.mocked(loadTrelloToken).mockReturnValueOnce(null)
+
+    const status = getStatus()
+    expect(status.connected).toBe(false)
+    expect(status.viewer).toEqual({ id: 'me', username: 'me', displayName: 'Me' })
+  })
+})
+
 describe('credential persistence (saveTrelloCredentials)', () => {
   it('updates in-memory cache after successful disk write', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+
     const realCredentials = await vi.importActual<typeof CredentialsModule>('./credentials')
     const {
       saveTrelloCredentials,
       getTrelloCredentialsMetadata,
       loadTrelloToken,
-      deleteTrelloCredentials
+      deleteTrelloCredentials,
+      __setTestBaseDir
     } = realCredentials
 
-    saveTrelloCredentials('test-key', 'test-token', {
-      id: 'u1',
-      username: 'testuser',
-      displayName: 'Test User'
-    })
+    const tempDir = mkdtempSync(join(tmpdir(), 'trello-test-'))
+    __setTestBaseDir(tempDir)
+    try {
+      saveTrelloCredentials('test-key', 'test-token', {
+        id: 'u1',
+        username: 'testuser',
+        displayName: 'Test User'
+      })
 
-    const meta = getTrelloCredentialsMetadata()
-    expect(meta.apiKey).toBe('test-key')
-    expect(meta.viewer?.username).toBe('testuser')
-    expect(meta.hasToken).toBe(true)
-    expect(loadTrelloToken()).toBe('test-token')
+      const meta = getTrelloCredentialsMetadata()
+      expect(meta.apiKey).toBe('test-key')
+      expect(meta.viewer?.username).toBe('testuser')
+      expect(meta.hasToken).toBe(true)
+      expect(loadTrelloToken()).toBe('test-token')
 
-    deleteTrelloCredentials()
+      deleteTrelloCredentials()
+    } finally {
+      __setTestBaseDir(undefined)
+      rmSync(tempDir, { recursive: true, force: true })
+    }
   })
 })

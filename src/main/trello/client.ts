@@ -264,8 +264,9 @@ export async function trelloDownload(urlString: string): Promise<{
 
 export function getStatus(): TrelloConnectionStatus {
   const file = getTrelloCredentialsMetadata()
+  const tokenReadable = file.hasToken && loadTrelloToken() !== null
   return {
-    connected: file.hasToken && !!file.apiKey && !!file.viewer,
+    connected: tokenReadable && !!file.apiKey && !!file.viewer,
     viewer: file.viewer
   }
 }

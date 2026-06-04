@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { TRELLO_DOWNLOAD_CHUNK_BASE64_CHARS } from './trello-method-schemas'
+import { isValidBase64, TRELLO_DOWNLOAD_CHUNK_BASE64_CHARS } from './trello-method-schemas'
 
 const TRELLO_UPLOAD_MAX_CONCURRENT = 8
 const TRELLO_UPLOAD_TTL_MS = 5 * 60 * 1000
@@ -115,11 +115,15 @@ export function getCommittedTrelloUpload(uploadId: string): {
   if (session.receivedBase64Length !== session.expectedBase64Length) {
     throw new Error('Trello upload is incomplete')
   }
+  const contentBase64 = session.chunks.join('')
+  if (!isValidBase64(contentBase64)) {
+    throw new Error('Assembled upload content is not valid base64')
+  }
   return {
-    cardId: session.cardId,
-    name: session.name,
-    mimeType: session.mimeType,
-    contentBase64: session.chunks.join('')
+    cardId: session.cardId.trim(),
+    name: session.name.trim(),
+    mimeType: session.mimeType.trim(),
+    contentBase64
   }
 }
 
@@ -148,6 +152,12 @@ export function pruneExpiredDownloadSessions(now = Date.now()): void {
       trelloDownloadSessions.delete(downloadId)
     }
   }
+}
+
+function refreshDownloadSessionExpiry(downloadId: string, session: TrelloDownloadSession): void {
+  clearTimeout(session.ttlTimer)
+  session.expiresAt = Date.now() + TRELLO_DOWNLOAD_TTL_MS
+  session.ttlTimer = scheduleDownloadSessionExpiry(downloadId)
 }
 
 function getDownloadSession(downloadId: string): TrelloDownloadSession {
@@ -192,8 +202,12 @@ export function readTrelloDownloadSessionChunk(args: {
   offset: number
   length: number
 }): { contentBase64: string } {
+  if (args.length > TRELLO_DOWNLOAD_CHUNK_BASE64_CHARS) {
+    throw new Error('Trello download chunk exceeds maximum allowed size')
+  }
   const session = getDownloadSession(args.downloadId)
   const end = Math.min(args.offset + args.length, session.contentBase64.length)
+  refreshDownloadSessionExpiry(args.downloadId, session)
   return { contentBase64: session.contentBase64.slice(args.offset, end) }
 }
 

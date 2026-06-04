@@ -12,6 +12,7 @@ import type {
 import type { CacheEntry } from './github'
 
 export type TrelloSlice = {
+  trelloCacheGeneration: number
   trelloStatus: TrelloConnectionStatus
   trelloStatusChecked: boolean
   trelloCardCache: Record<string, CacheEntry<TrelloCard>>

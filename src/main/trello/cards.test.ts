@@ -3,6 +3,8 @@ import {
   getCard,
   listBoardLabels,
   listBoardMembers,
+  listCards,
+  searchCards,
   updateCard,
   uploadCardAttachment
 } from './cards'
@@ -183,5 +185,98 @@ describe('Trello cards API', () => {
         contentBase64: 'AQID'
       })
     ).rejects.toThrow('Trello attachment upload returned no attachments')
+  })
+
+  it('listCards assigned requests member_fields in URL', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce([])
+
+    await listCards('assigned', 10)
+
+    const url = mockedTrelloRequest.mock.calls[0][0] as string
+    expect(url).toContain('member_fields=username,fullName,avatarUrl')
+    expect(url).toContain('fields=')
+    expect(url).toContain('members')
+  })
+
+  it('listCards allOpen requests member_fields per board', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce([])
+
+    await listCards('allOpen', 10, ['board-1'])
+
+    const url = mockedTrelloRequest.mock.calls[0][0] as string
+    expect(url).toContain('member_fields=username,fullName,avatarUrl')
+    expect(url).toContain('boards/board-1/cards')
+  })
+
+  it('getCard requests member_fields in URL', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce({
+      id: 'card-1',
+      name: 'Card',
+      desc: '',
+      shortLink: 'abc',
+      shortUrl: 'https://trello.com/c/abc',
+      url: 'https://trello.com/c/abc/card',
+      closed: false,
+      dueComplete: false,
+      due: null,
+      idBoard: 'board-1',
+      idList: 'list-1',
+      idShort: 1,
+      labels: [],
+      members: [],
+      dateLastActivity: '2026-01-01'
+    })
+
+    await getCard('card-1')
+
+    const url = mockedTrelloRequest.mock.calls[0][0] as string
+    expect(url).toContain('member_fields=username,fullName,avatarUrl')
+  })
+
+  it('searchCards requests cards_member_fields in URL', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce({ cards: [] })
+
+    await searchCards('test', 10)
+
+    const url = mockedTrelloRequest.mock.calls[0][0] as string
+    expect(url).toContain('cards_member_fields=username,fullName,avatarUrl')
+  })
+
+  it('listCards allOpen sorts across boards by dateLastActivity descending', async () => {
+    const olderCard = {
+      id: 'card-old',
+      name: 'Old Card',
+      desc: '',
+      shortLink: 'old',
+      shortUrl: 'https://trello.com/c/old',
+      url: 'https://trello.com/c/old/old-card',
+      closed: false,
+      dueComplete: false,
+      due: null,
+      idBoard: 'board-1',
+      idList: 'list-1',
+      idShort: 1,
+      labels: [],
+      members: [],
+      dateLastActivity: '2026-01-01'
+    }
+    const newerCard = {
+      ...olderCard,
+      id: 'card-new',
+      name: 'New Card',
+      shortLink: 'new',
+      shortUrl: 'https://trello.com/c/new',
+      url: 'https://trello.com/c/new/new-card',
+      idBoard: 'board-2',
+      dateLastActivity: '2026-06-01'
+    }
+
+    mockedTrelloRequest.mockResolvedValueOnce([olderCard]).mockResolvedValueOnce([newerCard])
+
+    const cards = await listCards('allOpen', 2, ['board-1', 'board-2'])
+
+    expect(cards).toHaveLength(2)
+    expect(cards[0].id).toBe('card-new')
+    expect(cards[1].id).toBe('card-old')
   })
 })

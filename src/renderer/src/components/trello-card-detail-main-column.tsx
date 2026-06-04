@@ -64,7 +64,8 @@ export function TrelloCardDetailMainColumn({
           value={title}
           onChange={(event) => onTitleChange(event.target.value)}
           placeholder="Card title"
-          className="w-full border-none bg-transparent p-0 text-3xl font-semibold leading-tight text-foreground outline-none placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus-visible:ring-0"
+          disabled={saving}
+          className="w-full border-none bg-transparent p-0 text-3xl font-semibold leading-tight text-foreground outline-none placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus-visible:ring-0 disabled:opacity-50"
         />
         <LinearIssueMarkdownDescriptionEditor
           value={description}

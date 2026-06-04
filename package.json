@@ -213,12 +213,12 @@
       "esbuild",
       "node-pty",
       "sherpa-onnx"
-    ]
-  },
-  "patchedDependencies": {
-    "node-pty@1.1.0": "config/patches/node-pty@1.1.0.patch",
-    "@xterm/addon-ligatures@0.11.0-beta.220": "config/patches/@xterm__addon-ligatures@0.11.0-beta.220.patch",
-    "@xterm/addon-webgl@0.20.0-beta.219": "config/patches/@xterm__addon-webgl@0.20.0-beta.219.patch"
+    ],
+    "patchedDependencies": {
+      "node-pty@1.1.0": "config/patches/node-pty@1.1.0.patch",
+      "@xterm/addon-ligatures@0.11.0-beta.220": "config/patches/@xterm__addon-ligatures@0.11.0-beta.220.patch",
+      "@xterm/addon-webgl@0.20.0-beta.219": "config/patches/@xterm__addon-webgl@0.20.0-beta.219.patch"
+    }
   },
   "reactDoctor": {
     "rules": {

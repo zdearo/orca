@@ -60,6 +60,7 @@ export function clearTrelloInflight(): void {
  */
 export function createInitialTrelloState() {
   return {
+    trelloCacheGeneration: 0,
     trelloStatus: { connected: false, viewer: null } as const,
     trelloStatusChecked: false,
     trelloCardCache: {} as Record<string, CacheEntry<TrelloCard>>,

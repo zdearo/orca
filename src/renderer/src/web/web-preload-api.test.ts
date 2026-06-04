@@ -1926,3 +1926,78 @@ describe('web GitLab preload API', () => {
     ])
   })
 })
+
+describe('web Trello preload API', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.doUnmock('./web-runtime-client')
+  })
+
+  it('provides a trello namespace that proxies every key to the runtime', async () => {
+    const runtimeCalls: { method: string; params: unknown }[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          runtimeCalls.push({ method, params })
+          return Promise.resolve({
+            id: `call-${runtimeCalls.length}`,
+            ok: true,
+            result: null,
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    expect(typeof globals.window.api.trello.connect).toBe('function')
+    expect(typeof globals.window.api.trello.disconnect).toBe('function')
+    expect(typeof globals.window.api.trello.status).toBe('function')
+    expect(typeof globals.window.api.trello.listBoards).toBe('function')
+    expect(typeof globals.window.api.trello.listCards).toBe('function')
+    expect(typeof globals.window.api.trello.getCard).toBe('function')
+    expect(typeof globals.window.api.trello.createCard).toBe('function')
+    expect(typeof globals.window.api.trello.searchCards).toBe('function')
+  })
+
+  it('routes trello.listCards through the runtime RPC', async () => {
+    const runtimeCalls: { method: string; params: unknown }[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          runtimeCalls.push({ method, params })
+          return Promise.resolve({
+            id: `call-${runtimeCalls.length}`,
+            ok: true,
+            result: [],
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await globals.window.api.trello.listCards({ filter: 'assigned' })
+
+    expect(runtimeCalls).toEqual([
+      {
+        method: 'trello.listCards',
+        params: { filter: 'assigned' }
+      }
+    ])
+  })
+})

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { TrelloComment } from '../../../shared/trello-types'
 import { useAppStore } from '@/store'
 
@@ -7,7 +7,7 @@ type UseTrelloCardDetailCommentsArgs = {
   setError: (value: string | null) => void
 }
 
-type TrelloCardCommentState = {
+type CurrentTrelloCardCommentState = {
   comments: TrelloComment[]
   commentsLoading: boolean
   commentsError: string | null
@@ -18,58 +18,134 @@ type TrelloCardCommentState = {
   addComment: () => Promise<void>
 }
 
+type StoredTrelloCardCommentState = {
+  cardId: string
+  comments: TrelloComment[]
+  commentsLoading: boolean
+  commentsError: string | null
+  commentText: string
+  commentSubmitting: boolean
+}
+
+function emptyCommentState(cardId: string): StoredTrelloCardCommentState {
+  return {
+    cardId,
+    comments: [],
+    commentsLoading: false,
+    commentsError: null,
+    commentText: '',
+    commentSubmitting: false
+  }
+}
+
+function stateForCard(
+  state: StoredTrelloCardCommentState,
+  cardId: string
+): StoredTrelloCardCommentState {
+  if (state.cardId === cardId) {
+    return state
+  }
+  return emptyCommentState(cardId)
+}
+
 export function useTrelloCardDetailComments({
   cardId,
   setError
-}: UseTrelloCardDetailCommentsArgs): TrelloCardCommentState {
+}: UseTrelloCardDetailCommentsArgs): CurrentTrelloCardCommentState {
   const fetchTrelloComments = useAppStore((state) => state.fetchTrelloComments)
   const addTrelloCardComment = useAppStore((state) => state.addTrelloCardComment)
-  const [comments, setComments] = useState<TrelloComment[]>([])
-  const [commentsLoading, setCommentsLoading] = useState(false)
-  const [commentsError, setCommentsError] = useState<string | null>(null)
-  const [commentText, setCommentText] = useState('')
-  const [commentSubmitting, setCommentSubmitting] = useState(false)
+  const [storedState, setStoredState] = useState(() => emptyCommentState(cardId))
+  const requestIdRef = useRef(0)
+  const currentState = stateForCard(storedState, cardId)
+
+  const setCommentText = useCallback(
+    (value: string): void => {
+      setStoredState((state) => ({
+        ...stateForCard(state, cardId),
+        commentText: value
+      }))
+    },
+    [cardId]
+  )
 
   const loadComments = useCallback(
     async (options?: { force?: boolean }): Promise<void> => {
-      setCommentsLoading(true)
-      setCommentsError(null)
+      const requestId = ++requestIdRef.current
+      setStoredState((state) => ({
+        ...stateForCard(state, cardId),
+        commentsLoading: true,
+        commentsError: null
+      }))
       try {
-        setComments(await fetchTrelloComments(cardId, options))
+        const result = await fetchTrelloComments(cardId, options)
+        if (requestId !== requestIdRef.current) {
+          return
+        }
+        setStoredState((state) => ({
+          ...stateForCard(state, cardId),
+          comments: result
+        }))
       } catch (err) {
-        setCommentsError(err instanceof Error ? err.message : 'Failed to load Trello comments.')
+        if (requestId !== requestIdRef.current) {
+          return
+        }
+        setStoredState((state) => ({
+          ...stateForCard(state, cardId),
+          commentsError: err instanceof Error ? err.message : 'Failed to load Trello comments.'
+        }))
       } finally {
-        setCommentsLoading(false)
+        if (requestId === requestIdRef.current) {
+          setStoredState((state) => ({
+            ...stateForCard(state, cardId),
+            commentsLoading: false
+          }))
+        }
       }
     },
     [cardId, fetchTrelloComments]
   )
 
   const addComment = useCallback(async (): Promise<void> => {
-    const body = commentText.trim()
-    if (!body || commentSubmitting) {
+    const body = currentState.commentText.trim()
+    if (!body || currentState.commentSubmitting) {
       return
     }
-    setCommentSubmitting(true)
+    setStoredState((state) => ({
+      ...stateForCard(state, cardId),
+      commentSubmitting: true
+    }))
     try {
       const result = await addTrelloCardComment(cardId, body)
       if (!result.ok) {
         setError(result.error)
         return
       }
-      setCommentText('')
+      setStoredState((state) => ({
+        ...stateForCard(state, cardId),
+        commentText: ''
+      }))
       await loadComments({ force: true })
     } finally {
-      setCommentSubmitting(false)
+      setStoredState((state) => ({
+        ...stateForCard(state, cardId),
+        commentSubmitting: false
+      }))
     }
-  }, [addTrelloCardComment, cardId, commentSubmitting, commentText, loadComments, setError])
+  }, [
+    addTrelloCardComment,
+    cardId,
+    currentState.commentSubmitting,
+    currentState.commentText,
+    loadComments,
+    setError
+  ])
 
   return {
-    comments,
-    commentsLoading,
-    commentsError,
-    commentText,
-    commentSubmitting,
+    comments: currentState.comments,
+    commentsLoading: currentState.commentsLoading,
+    commentsError: currentState.commentsError,
+    commentText: currentState.commentText,
+    commentSubmitting: currentState.commentSubmitting,
     setCommentText,
     loadComments,
     addComment

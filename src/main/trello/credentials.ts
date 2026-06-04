@@ -23,7 +23,17 @@ let cachedMetadata: TrelloCredentialsMetadata | null = null
 let metadataLoaded = false
 let cachedToken: string | null = null
 
+let testBaseDir: string | undefined
+
+/** @internal Test-only seam — never called in production. */
+export function __setTestBaseDir(dir: string | undefined): void {
+  testBaseDir = dir
+}
+
 function getOrcaDir(): string {
+  if (testBaseDir) {
+    return join(testBaseDir, '.orca')
+  }
   return join(homedir(), '.orca')
 }
 

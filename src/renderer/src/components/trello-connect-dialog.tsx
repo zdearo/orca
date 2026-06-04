@@ -44,6 +44,9 @@ export function TrelloConnectDialog({
   }
 
   const handleOpenChange = (next: boolean): void => {
+    if (!next && phase !== 'idle') {
+      return
+    }
     if (!next) {
       ++attemptIdRef.current
       resetState()
@@ -180,7 +183,7 @@ export function TrelloConnectDialog({
             </div>
             <p className="text-[11px] text-muted-foreground/70">
               Trello does not require the Power-Up Secret for this token flow. The token is stored
-              encrypted on disk.
+              on disk.
             </p>
           </div>
 
@@ -192,7 +195,12 @@ export function TrelloConnectDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleOpenChange(false)}
+            disabled={phase !== 'idle'}
+          >
             Cancel
           </Button>
           <Button size="sm" onClick={() => void handleConnect()} disabled={phase !== 'idle'}>

@@ -17,8 +17,8 @@ export async function uploadTrelloAttachmentThroughRuntime(
       target,
       'trello.startUpload',
       {
-        cardId: args.cardId,
-        name: args.name,
+        cardId: args.cardId.trim(),
+        name: args.name.trim(),
         mimeType: args.mimeType,
         expectedBase64Length: args.contentBase64.length
       },

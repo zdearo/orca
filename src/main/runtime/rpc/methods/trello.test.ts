@@ -362,4 +362,53 @@ describe('trello RPC methods', () => {
     )
     expect(readResult.ok).toBe(false)
   })
+
+  it('chunked upload: commit rejects invalid assembled base64', async () => {
+    const runtime = makeRuntimeMock()
+    const dispatcher = new RpcDispatcher({ runtime, methods: TRELLO_METHODS })
+
+    const startResult = await dispatcher.dispatch(
+      makeRequest('trello.startUpload', {
+        cardId: 'card-1',
+        name: 'test.png',
+        mimeType: 'image/png',
+        expectedBase64Length: 4
+      })
+    )
+    const uploadId = (startResult as { ok: true; result: { uploadId: string } }).result.uploadId
+
+    await dispatcher.dispatch(
+      makeRequest('trello.appendUploadChunk', {
+        uploadId,
+        offset: 0,
+        contentBase64: '!!!'
+      })
+    )
+
+    const commitResult = await dispatcher.dispatch(makeRequest('trello.commitUpload', { uploadId }))
+    expect(commitResult.ok).toBe(false)
+    expect(runtime.trelloUploadAttachment).not.toHaveBeenCalled()
+  })
+
+  it('chunked download: rejects read length exceeding max chunk size', async () => {
+    const runtime = makeRuntimeMock()
+    vi.mocked(runtime.trelloDownloadImage).mockResolvedValue({
+      ok: true,
+      contentType: 'image/png',
+      contentBase64: 'AAAA'
+    })
+    const dispatcher = new RpcDispatcher({ runtime, methods: TRELLO_METHODS })
+
+    const startResult = await dispatcher.dispatch(
+      makeRequest('trello.startDownload', { url: 'https://trello.com/image.png' })
+    )
+    const downloadId = (startResult as { ok: true; result: { downloadId: string } }).result
+      .downloadId
+
+    const tooLarge = 512 * 1024 + 1
+    const readResult = await dispatcher.dispatch(
+      makeRequest('trello.readDownloadChunk', { downloadId, offset: 0, length: tooLarge })
+    )
+    expect(readResult.ok).toBe(false)
+  })
 })

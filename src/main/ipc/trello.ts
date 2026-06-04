@@ -35,6 +35,10 @@ function normalizeStringArray(value: unknown): string[] | undefined {
   }
   return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : undefined
 }
+const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
+function isValidBase64(value: string): boolean {
+  return value.length % 4 !== 1 && BASE64_PATTERN.test(value)
+}
 
 function normalizeCardUpdate(value: unknown): TrelloCardUpdate | null {
   if (!value || typeof value !== 'object') {
@@ -233,6 +237,9 @@ export function registerTrelloHandlers(): void {
     }
     if (typeof args?.contentBase64 !== 'string' || !args.contentBase64.trim()) {
       return { ok: false as const, error: 'Attachment content is required.' }
+    }
+    if (!isValidBase64(args.contentBase64)) {
+      return { ok: false as const, error: 'Attachment content is not valid base64.' }
     }
     try {
       const attachment = await uploadCardAttachment({

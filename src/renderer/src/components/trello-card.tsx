@@ -106,7 +106,7 @@ export function TrelloCard({ onOpenConnectDialog }: TrelloCardProps): React.JSX.
       {trelloStatus.connected && (
         <div className="mt-3">
           <p className="text-[11px] text-muted-foreground/70">
-            API key and token are stored encrypted on disk. Disconnect to remove them.
+            API key and token are stored on disk. Disconnect to remove them.
           </p>
         </div>
       )}

@@ -24,13 +24,12 @@ export function createTrelloReferenceDataActions(
       if (cached !== null) {
         return cached
       }
-      try {
-        const boards = await trelloListBoards(get().settings)
+      const gen = get().trelloCacheGeneration
+      const boards = await trelloListBoards(get().settings)
+      if (get().trelloCacheGeneration === gen) {
         set({ trelloBoardsCache: boards })
-        return boards
-      } catch {
-        return []
       }
+      return boards
     },
 
     fetchTrelloLists: async (boardId) => {
@@ -38,15 +37,14 @@ export function createTrelloReferenceDataActions(
       if (cached) {
         return cached
       }
-      try {
-        const lists = await trelloListLists(get().settings, boardId)
+      const gen = get().trelloCacheGeneration
+      const lists = await trelloListLists(get().settings, boardId)
+      if (get().trelloCacheGeneration === gen) {
         set((s) => ({
           trelloListsCache: { ...s.trelloListsCache, [boardId]: lists }
         }))
-        return lists
-      } catch {
-        return []
       }
+      return lists
     },
 
     fetchTrelloBoardMembers: async (boardId) => {
@@ -54,15 +52,14 @@ export function createTrelloReferenceDataActions(
       if (cached) {
         return cached
       }
-      try {
-        const members = await trelloListBoardMembers(get().settings, boardId)
+      const gen = get().trelloCacheGeneration
+      const members = await trelloListBoardMembers(get().settings, boardId)
+      if (get().trelloCacheGeneration === gen) {
         set((s) => ({
           trelloBoardMembersCache: { ...s.trelloBoardMembersCache, [boardId]: members }
         }))
-        return members
-      } catch {
-        return []
       }
+      return members
     },
 
     fetchTrelloBoardLabels: async (boardId) => {
@@ -70,15 +67,14 @@ export function createTrelloReferenceDataActions(
       if (cached) {
         return cached
       }
-      try {
-        const labels = await trelloListBoardLabels(get().settings, boardId)
+      const gen = get().trelloCacheGeneration
+      const labels = await trelloListBoardLabels(get().settings, boardId)
+      if (get().trelloCacheGeneration === gen) {
         set((s) => ({
           trelloBoardLabelsCache: { ...s.trelloBoardLabelsCache, [boardId]: labels }
         }))
-        return labels
-      } catch {
-        return []
       }
+      return labels
     }
   }
 }
