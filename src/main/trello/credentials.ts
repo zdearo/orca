@@ -28,6 +28,9 @@ let testBaseDir: string | undefined
 /** @internal Test-only seam — never called in production. */
 export function __setTestBaseDir(dir: string | undefined): void {
   testBaseDir = dir
+  cachedToken = null
+  cachedMetadata = null
+  metadataLoaded = false
 }
 
 function getOrcaDir(): string {

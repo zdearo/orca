@@ -70,9 +70,62 @@ export async function listBoardLabels(boardId: string): Promise<TrelloLabel[]> {
   }
 }
 
+const CARD_MEMBER_FIELDS = 'username,fullName,avatarUrl'
 const CARD_FIELDS =
-  'name,desc,url,shortUrl,shortLink,closed,dueComplete,due,idBoard,idList,labels,members,dateLastActivity,idShort'
-const CARD_CONTEXT_FIELDS = `fields=${CARD_FIELDS}&board=true&board_fields=name,url,shortUrl&list=true&list_fields=name&member_fields=username,fullName,avatarUrl`
+  'name,desc,url,shortUrl,shortLink,closed,dueComplete,due,idBoard,idList,idMembers,labels,dateLastActivity,idShort'
+const CARD_CONTEXT_FIELDS = `fields=${CARD_FIELDS}&board=true&board_fields=name,url,shortUrl&list=true&list_fields=name&members=true&member_fields=${CARD_MEMBER_FIELDS}`
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
+}
+
+function cardRequiresMemberHydration(card: Record<string, unknown>): boolean {
+  const memberIds = stringArray(card.idMembers)
+  const members = Array.isArray(card.members) ? card.members : []
+  return memberIds.length > members.length && typeof card.idBoard === 'string'
+}
+
+async function mapCardsWithHydratedMembers(
+  rawCards: Record<string, unknown>[]
+): Promise<TrelloCard[]> {
+  const boardIds = new Set<string>()
+  for (const card of rawCards) {
+    if (cardRequiresMemberHydration(card)) {
+      boardIds.add(card.idBoard as string)
+    }
+  }
+  if (boardIds.size === 0) {
+    return rawCards.map(mapTrelloCard)
+  }
+
+  const membersByBoard = new Map<string, Map<string, TrelloMember>>()
+  for (const boardId of boardIds) {
+    const data = await trelloRequest<Record<string, unknown>[]>(
+      `/boards/${boardId}/members?fields=${CARD_MEMBER_FIELDS}`
+    )
+    membersByBoard.set(
+      boardId,
+      new Map(data.map(mapTrelloMember).map((member) => [member.id, member]))
+    )
+  }
+
+  return rawCards.map((card) => {
+    if (!cardRequiresMemberHydration(card)) {
+      return mapTrelloCard(card)
+    }
+    const members = membersByBoard.get(card.idBoard as string)
+    if (!members) {
+      return mapTrelloCard(card)
+    }
+    return mapTrelloCard({
+      ...card,
+      members: stringArray(card.idMembers)
+        .map((memberId) => members.get(memberId))
+        .filter((member): member is TrelloMember => Boolean(member))
+    })
+  })
+}
 
 export async function listCards(
   filter: TrelloCardFilter = 'assigned',
@@ -85,7 +138,7 @@ export async function listCards(
       const data = await trelloRequest<Record<string, unknown>[]>(
         `/members/me/cards?filter=open&${CARD_CONTEXT_FIELDS}&limit=${limit}`
       )
-      return data.map(mapTrelloCard)
+      return mapCardsWithHydratedMembers(data)
     }
 
     // For allOpen and archived, we need to query by board
@@ -94,13 +147,14 @@ export async function listCards(
     }
 
     const trelloFilter = filter === 'archived' ? 'closed' : 'open'
-    const allCards: TrelloCard[] = []
+    const allRawCards: Record<string, unknown>[] = []
     for (const boardId of boardIds) {
       const data = await trelloRequest<Record<string, unknown>[]>(
         `/boards/${boardId}/cards?filter=${trelloFilter}&${CARD_CONTEXT_FIELDS}&limit=${limit}`
       )
-      allCards.push(...data.map(mapTrelloCard))
+      allRawCards.push(...data)
     }
+    const allCards = await mapCardsWithHydratedMembers(allRawCards)
     allCards.sort((a, b) => (b.dateLastActivity || '').localeCompare(a.dateLastActivity || ''))
     return allCards.slice(0, limit)
   } finally {
@@ -115,12 +169,12 @@ export async function searchCards(
 ): Promise<TrelloCard[]> {
   await acquire()
   try {
-    let path = `/search?query=${encodeURIComponent(query)}&modelTypes=cards&cards_limit=${limit}&card_fields=${CARD_FIELDS}&cards_board=true&cards_list=true&cards_member_fields=username,fullName,avatarUrl`
+    let path = `/search?query=${encodeURIComponent(query)}&modelTypes=cards&cards_limit=${limit}&card_fields=${CARD_FIELDS}&cards_board=true&cards_list=true`
     if (boardIds && boardIds.length > 0) {
       path += `&idBoards=${boardIds.join(',')}`
     }
     const data = await trelloRequest<{ cards?: Record<string, unknown>[] }>(path)
-    return (data.cards ?? []).map(mapTrelloCard)
+    return mapCardsWithHydratedMembers(data.cards ?? [])
   } finally {
     release()
   }
@@ -132,7 +186,8 @@ export async function getCard(cardId: string): Promise<TrelloCard | null> {
     const data = await trelloRequest<Record<string, unknown>>(
       `/cards/${cardId}?${CARD_CONTEXT_FIELDS}`
     )
-    return mapTrelloCard(data)
+    const cards = await mapCardsWithHydratedMembers([data])
+    return cards[0] ?? null
   } finally {
     release()
   }

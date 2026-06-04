@@ -13,6 +13,10 @@ import type {
 } from '@/components/trello-task-source-controls'
 import type { TrelloTaskSourceController } from '@/components/trello-task-source-controller-types'
 import { useTrelloTaskSourceCardDerivations } from '@/components/trello-task-source-card-derivations'
+import {
+  trelloCardMatchesFilter,
+  trelloCardMatchesVisibleScope
+} from '@/components/trello-task-source-card-visibility'
 
 type TrelloSelectedListSelection = {
   boardId: string
@@ -54,18 +58,16 @@ export function useTrelloTaskSourceController(): TrelloTaskSourceController {
   const cardRequestIdRef = useRef(0)
   const boardListsRequestIdRef = useRef(0)
 
-  const cardMatchesFilter = useCallback(
-    (card: TrelloCard): boolean => {
-      if (filter === 'archived') {
-        return card.closed
-      }
-      if (filter === 'allOpen') {
-        return !card.closed
-      }
-      const viewerId = trelloStatus.viewer?.id
-      return viewerId ? card.members.some((member) => member.id === viewerId) : true
-    },
-    [filter, trelloStatus.viewer?.id]
+  const cardMatchesVisibleScope = useCallback(
+    (card: TrelloCard): boolean =>
+      trelloCardMatchesVisibleScope(card, {
+        filter,
+        viewerId: trelloStatus.viewer?.id,
+        selectedBoardId,
+        selectedListId,
+        query
+      }),
+    [filter, query, selectedBoardId, selectedListId, trelloStatus.viewer?.id]
   )
 
   const setSelectedListId = useCallback(
@@ -136,16 +138,9 @@ export function useTrelloTaskSourceController(): TrelloTaskSourceController {
           isTruncated = searchResults.length >= 50
           // Reconcile search with filter: apply the same filter semantics as browsing
           // when Trello search cannot combine the list filter server-side.
-          const viewerId = trelloStatus.viewer?.id
-          nextCards = searchResults.filter((card) => {
-            if (filter === 'archived') {
-              return card.closed
-            }
-            if (filter === 'allOpen') {
-              return !card.closed
-            }
-            return viewerId ? card.members.some((member) => member.id === viewerId) : true
-          })
+          nextCards = searchResults.filter((card) =>
+            trelloCardMatchesFilter(card, filter, trelloStatus.viewer?.id)
+          )
         } else {
           nextCards = await listTrelloCards(
             filter,
@@ -221,35 +216,47 @@ export function useTrelloTaskSourceController(): TrelloTaskSourceController {
       setBoardLists([])
       return
     }
-    void fetchTrelloLists(selectedBoardId).then((lists) => {
-      if (requestId !== boardListsRequestIdRef.current) {
-        return
-      }
-      setBoardLists(lists.filter((list) => !list.closed))
-    })
+    void fetchTrelloLists(selectedBoardId)
+      .then((lists) => {
+        if (requestId !== boardListsRequestIdRef.current) {
+          return
+        }
+        setBoardLists(lists.filter((list) => !list.closed))
+      })
+      .catch((err) => {
+        if (requestId !== boardListsRequestIdRef.current) {
+          return
+        }
+        setBoardLists([])
+        setError(err instanceof Error ? err.message : 'Failed to load Trello lists.')
+      })
   }, [fetchTrelloLists, selectedBoardId, trelloStatus.connected])
 
   const handleSelectedCardUpdated = useCallback(
     (updated: TrelloCard): void => {
       setSelectedCard(updated)
       setCards((prev) => {
-        if (!cardMatchesFilter(updated)) {
+        if (!cardMatchesVisibleScope(updated)) {
           return prev.filter((card) => card.id !== updated.id)
+        }
+        const hasExisting = prev.some((card) => card.id === updated.id)
+        if (!hasExisting) {
+          return [updated, ...prev]
         }
         return prev.map((card) => (card.id === updated.id ? updated : card))
       })
     },
-    [cardMatchesFilter]
+    [cardMatchesVisibleScope]
   )
 
   const handleCreatedCard = useCallback(
     (card: TrelloCard): void => {
-      if (cardMatchesFilter(card)) {
+      if (cardMatchesVisibleScope(card)) {
         setCards((prev) => [card, ...prev])
       }
       setSelectedCard(card)
     },
-    [cardMatchesFilter]
+    [cardMatchesVisibleScope]
   )
 
   return {

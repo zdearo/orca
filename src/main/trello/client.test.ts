@@ -289,4 +289,38 @@ describe('credential persistence (saveTrelloCredentials)', () => {
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
+
+  it('clears in-memory credentials when switching test base directories', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+
+    const realCredentials = await vi.importActual<typeof CredentialsModule>('./credentials')
+    const {
+      saveTrelloCredentials,
+      getTrelloCredentialsMetadata,
+      loadTrelloToken,
+      __setTestBaseDir
+    } = realCredentials
+
+    const firstDir = mkdtempSync(join(tmpdir(), 'trello-test-a-'))
+    const secondDir = mkdtempSync(join(tmpdir(), 'trello-test-b-'))
+    try {
+      __setTestBaseDir(firstDir)
+      saveTrelloCredentials('test-key', 'test-token', {
+        id: 'u1',
+        username: 'testuser',
+        displayName: 'Test User'
+      })
+      expect(loadTrelloToken()).toBe('test-token')
+
+      __setTestBaseDir(secondDir)
+      expect(getTrelloCredentialsMetadata()).toEqual({ apiKey: '', viewer: null, hasToken: false })
+      expect(loadTrelloToken()).toBeNull()
+    } finally {
+      __setTestBaseDir(undefined)
+      rmSync(firstDir, { recursive: true, force: true })
+      rmSync(secondDir, { recursive: true, force: true })
+    }
+  })
 })

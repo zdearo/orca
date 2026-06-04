@@ -187,28 +187,30 @@ describe('Trello cards API', () => {
     ).rejects.toThrow('Trello attachment upload returned no attachments')
   })
 
-  it('listCards assigned requests member_fields in URL', async () => {
+  it('listCards assigned requests expanded member data in URL', async () => {
     mockedTrelloRequest.mockResolvedValueOnce([])
 
     await listCards('assigned', 10)
 
     const url = mockedTrelloRequest.mock.calls[0][0] as string
+    expect(url).toContain('members=true')
     expect(url).toContain('member_fields=username,fullName,avatarUrl')
     expect(url).toContain('fields=')
-    expect(url).toContain('members')
+    expect(url).toContain('idMembers')
   })
 
-  it('listCards allOpen requests member_fields per board', async () => {
+  it('listCards allOpen requests expanded member data per board', async () => {
     mockedTrelloRequest.mockResolvedValueOnce([])
 
     await listCards('allOpen', 10, ['board-1'])
 
     const url = mockedTrelloRequest.mock.calls[0][0] as string
-    expect(url).toContain('member_fields=username,fullName,avatarUrl')
     expect(url).toContain('boards/board-1/cards')
+    expect(url).toContain('members=true')
+    expect(url).toContain('member_fields=username,fullName,avatarUrl')
   })
 
-  it('getCard requests member_fields in URL', async () => {
+  it('getCard requests expanded member data in URL', async () => {
     mockedTrelloRequest.mockResolvedValueOnce({
       id: 'card-1',
       name: 'Card',
@@ -222,6 +224,7 @@ describe('Trello cards API', () => {
       idBoard: 'board-1',
       idList: 'list-1',
       idShort: 1,
+      idMembers: [],
       labels: [],
       members: [],
       dateLastActivity: '2026-01-01'
@@ -230,16 +233,57 @@ describe('Trello cards API', () => {
     await getCard('card-1')
 
     const url = mockedTrelloRequest.mock.calls[0][0] as string
+    expect(url).toContain('members=true')
     expect(url).toContain('member_fields=username,fullName,avatarUrl')
   })
 
-  it('searchCards requests cards_member_fields in URL', async () => {
-    mockedTrelloRequest.mockResolvedValueOnce({ cards: [] })
+  it('searchCards hydrates members from board membership when search omits expanded members', async () => {
+    mockedTrelloRequest
+      .mockResolvedValueOnce({
+        cards: [
+          {
+            id: 'card-1',
+            name: 'Card',
+            desc: '',
+            shortLink: 'abc',
+            shortUrl: 'https://trello.com/c/abc',
+            url: 'https://trello.com/c/abc/card',
+            closed: false,
+            dueComplete: false,
+            due: null,
+            idBoard: 'board-1',
+            idList: 'list-1',
+            idShort: 1,
+            idMembers: ['m-1'],
+            labels: [],
+            members: [],
+            dateLastActivity: '2026-01-01'
+          }
+        ]
+      })
+      .mockResolvedValueOnce([
+        {
+          id: 'm-1',
+          username: 'ada',
+          fullName: 'Ada Lovelace',
+          avatarUrl: 'https://a.trello.test/avatar'
+        }
+      ])
 
-    await searchCards('test', 10)
+    const cards = await searchCards('test', 10)
 
-    const url = mockedTrelloRequest.mock.calls[0][0] as string
-    expect(url).toContain('cards_member_fields=username,fullName,avatarUrl')
+    expect(cards[0]?.members).toEqual([
+      {
+        id: 'm-1',
+        username: 'ada',
+        fullName: 'Ada Lovelace',
+        avatarUrl: 'https://a.trello.test/avatar/50.png'
+      }
+    ])
+    expect(mockedTrelloRequest.mock.calls[0][0]).not.toContain('cards_member_fields')
+    expect(mockedTrelloRequest.mock.calls[1][0]).toBe(
+      '/boards/board-1/members?fields=username,fullName,avatarUrl'
+    )
   })
 
   it('listCards allOpen sorts across boards by dateLastActivity descending', async () => {
