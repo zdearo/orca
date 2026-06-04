@@ -13,6 +13,7 @@ import { normalizeTaskProviderSettings } from '../../../../shared/task-providers
 import { normalizeOpenInApplications } from '../../../../shared/open-in-applications'
 import { createSettingsSearchState, type SettingsSearchState } from './settings-search-state'
 import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import { createInitialTrelloState, clearTrelloInflight } from './trello-cache-state'
 
 export type SettingsSlice = SettingsSearchState & {
   settings: GlobalSettings | null
@@ -136,7 +137,8 @@ function runtimeScopedStateReset(): Partial<AppState> {
     jiraStatus: { connected: false, viewer: null },
     jiraStatusChecked: false,
     jiraIssueCache: {},
-    jiraSearchCache: {}
+    jiraSearchCache: {},
+    ...createInitialTrelloState()
   }
 }
 
@@ -318,6 +320,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
       const nextSettings = await window.api.settings.set({
         activeRuntimeEnvironmentId: nextId
       })
+      clearTrelloInflight()
       set((s) => ({
         ...runtimeScopedStateReset(),
         settings:

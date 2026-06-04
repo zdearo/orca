@@ -66,6 +66,9 @@ export const WORKTREE_METHODS: RpcMethod[] = [
         linkedLinearIssue: params.linkedLinearIssue,
         linkedGitLabMR: params.linkedGitLabMR,
         linkedGitLabIssue: params.linkedGitLabIssue,
+        ...(params.linkedTrelloCard !== undefined
+          ? { linkedTrelloCard: params.linkedTrelloCard }
+          : {}),
         comment: params.comment,
         displayName: params.displayName,
         telemetrySource: params.telemetrySource,
@@ -117,6 +120,9 @@ export const WORKTREE_METHODS: RpcMethod[] = [
         linkedLinearIssue: params.linkedLinearIssue,
         linkedGitLabMR: params.linkedGitLabMR,
         linkedGitLabIssue: params.linkedGitLabIssue,
+        ...(params.linkedTrelloCard !== undefined
+          ? { linkedTrelloCard: params.linkedTrelloCard }
+          : {}),
         comment: params.comment,
         isArchived: params.isArchived,
         isUnread: params.isUnread,

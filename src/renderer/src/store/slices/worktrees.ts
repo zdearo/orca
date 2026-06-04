@@ -1017,6 +1017,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     workspaceStatus,
     linkedGitLabMR,
     linkedGitLabIssue,
+    linkedTrelloCard,
     startup,
     pendingFirstAgentMessageRename
   ) => {
@@ -1064,7 +1065,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(manualOrder !== undefined ? { manualOrder } : {}),
             ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
             ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
-            ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {})
+            ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
+            ...(linkedTrelloCard !== undefined ? { linkedTrelloCard } : {})
           }
           const target = getActiveRuntimeTarget(get().settings)
           const result =
@@ -1094,6 +1096,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
                     ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
                     ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
+                    ...(linkedTrelloCard !== undefined ? { linkedTrelloCard } : {}),
                     ...(startup
                       ? {
                           startupCommand: startup.command,

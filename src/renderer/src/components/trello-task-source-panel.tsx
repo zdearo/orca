@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import type {
   TrelloBoard,
@@ -65,6 +65,9 @@ export function TrelloTaskSourcePanel({
 
   const selectedListId =
     selectedListSelection.boardId === selectedBoardId ? selectedListSelection.listId : 'all'
+  const cardRequestIdRef = useRef(0)
+  const boardListsRequestIdRef = useRef(0)
+
   const setSelectedListId = useCallback(
     (listId: string): void => {
       setSelectedListSelection({ boardId: selectedBoardId, listId })
@@ -179,40 +182,73 @@ export function TrelloTaskSourcePanel({
       if (!trelloStatus.connected) {
         return
       }
+      const requestId = ++cardRequestIdRef.current
       setLoading(true)
       setError(null)
       try {
         const loadedBoards = await fetchTrelloBoards()
+        if (requestId !== cardRequestIdRef.current) {
+          return
+        }
         setBoards(loadedBoards)
         const boardIds =
           selectedBoardId === 'all' ? loadedBoards.map((b) => b.id) : [selectedBoardId]
         const listGroups = await Promise.all(
           boardIds.map((boardId) => fetchTrelloLists(boardId).catch(() => [] as TrelloList[]))
         )
+        if (requestId !== cardRequestIdRef.current) {
+          return
+        }
         setKnownLists(listGroups.flat())
         const trimmedQuery = query.trim()
-        const nextCards = trimmedQuery
-          ? await searchTrelloCards(
-              trimmedQuery,
-              50,
-              boardIds.length > 0 ? boardIds : undefined,
-              options
-            )
-          : await listTrelloCards(
-              filter,
-              50,
-              filter === 'assigned' && selectedBoardId === 'all' ? undefined : boardIds,
-              options
-            )
+        let nextCards: TrelloCard[]
+        if (trimmedQuery) {
+          const searchResults = await searchTrelloCards(
+            trimmedQuery,
+            50,
+            boardIds.length > 0 ? boardIds : undefined,
+            options
+          )
+          if (requestId !== cardRequestIdRef.current) {
+            return
+          }
+          // Reconcile search with filter: apply the same filter semantics as browsing
+          // when Trello search cannot combine the list filter server-side.
+          const viewerId = trelloStatus.viewer?.id
+          nextCards = searchResults.filter((card) => {
+            if (filter === 'archived') {
+              return card.closed
+            }
+            if (filter === 'allOpen') {
+              return !card.closed
+            }
+            return viewerId ? card.members.some((member) => member.id === viewerId) : true
+          })
+        } else {
+          nextCards = await listTrelloCards(
+            filter,
+            50,
+            filter === 'assigned' && selectedBoardId === 'all' ? undefined : boardIds,
+            options
+          )
+          if (requestId !== cardRequestIdRef.current) {
+            return
+          }
+        }
         setCards(
           selectedBoardId === 'all'
             ? nextCards
             : nextCards.filter((card) => card.idBoard === selectedBoardId)
         )
       } catch (err) {
+        if (requestId !== cardRequestIdRef.current) {
+          return
+        }
         setError(err instanceof Error ? err.message : 'Failed to load Trello cards.')
       } finally {
-        setLoading(false)
+        if (requestId === cardRequestIdRef.current) {
+          setLoading(false)
+        }
       }
     },
     [
@@ -223,7 +259,8 @@ export function TrelloTaskSourcePanel({
       query,
       searchTrelloCards,
       selectedBoardId,
-      trelloStatus.connected
+      trelloStatus.connected,
+      trelloStatus.viewer?.id
     ]
   )
 
@@ -255,11 +292,15 @@ export function TrelloTaskSourcePanel({
   }, [refreshCards])
 
   useEffect(() => {
+    const requestId = ++boardListsRequestIdRef.current
     if (!trelloStatus.connected || selectedBoardId === 'all') {
       setBoardLists([])
       return
     }
     void fetchTrelloLists(selectedBoardId).then((lists) => {
+      if (requestId !== boardListsRequestIdRef.current) {
+        return
+      }
       setBoardLists(lists.filter((list) => !list.closed))
     })
   }, [fetchTrelloLists, selectedBoardId, trelloStatus.connected])

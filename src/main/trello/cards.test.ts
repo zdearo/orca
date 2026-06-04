@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { listBoardLabels, listBoardMembers, updateCard, uploadCardAttachment } from './cards'
+import {
+  getCard,
+  listBoardLabels,
+  listBoardMembers,
+  updateCard,
+  uploadCardAttachment
+} from './cards'
 import { trelloRequest } from './client'
 
 vi.mock('./client', () => ({
@@ -72,13 +78,15 @@ describe('Trello cards API', () => {
   })
 
   it('uploads pasted data images as Trello card attachments', async () => {
-    mockedTrelloRequest.mockResolvedValueOnce({
-      id: 'att-1',
-      name: 'image.png',
-      fileName: 'image.png',
-      mimeType: 'image/png',
-      url: 'https://trello.com/1/cards/card-1/attachments/att-1/download/image.png'
-    })
+    mockedTrelloRequest.mockResolvedValueOnce([
+      {
+        id: 'att-1',
+        name: 'image.png',
+        fileName: 'image.png',
+        mimeType: 'image/png',
+        url: 'https://trello.com/1/cards/card-1/attachments/att-1/download/image.png'
+      }
+    ])
 
     await expect(
       uploadCardAttachment({
@@ -99,5 +107,81 @@ describe('Trello cards API', () => {
       method: 'POST',
       body: expect.any(FormData)
     })
+  })
+  it('maps Trello idShort into shared shortId', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce({
+      id: 'card-1',
+      name: 'My Card',
+      desc: '',
+      shortLink: 'abc123',
+      shortUrl: 'https://trello.com/c/abc123',
+      url: 'https://trello.com/c/abc123/my-card',
+      closed: false,
+      dueComplete: false,
+      due: null,
+      idBoard: 'board-1',
+      idList: 'list-1',
+      idShort: 42,
+      labels: [],
+      members: [],
+      dateLastActivity: '2026-01-01'
+    })
+
+    const card = await getCard('card-1')
+    expect(card).toEqual(expect.objectContaining({ shortId: '42' }))
+  })
+
+  it('preserves card-embedded members via mapTrelloCard', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce({
+      id: 'card-1',
+      name: 'My Card',
+      desc: '',
+      shortLink: 'abc123',
+      shortUrl: 'https://trello.com/c/abc123',
+      url: 'https://trello.com/c/abc123/my-card',
+      closed: false,
+      dueComplete: false,
+      due: null,
+      idBoard: 'board-1',
+      idList: 'list-1',
+      idShort: 7,
+      labels: [],
+      members: [
+        {
+          id: 'u-1',
+          username: 'ada',
+          fullName: 'Ada Lovelace',
+          avatarUrl: 'https://a.trello.test/avatar'
+        }
+      ],
+      dateLastActivity: '2026-01-01'
+    })
+
+    const card = await getCard('card-1')
+    expect(card).toEqual(
+      expect.objectContaining({
+        members: [
+          {
+            id: 'u-1',
+            username: 'ada',
+            fullName: 'Ada Lovelace',
+            avatarUrl: 'https://a.trello.test/avatar/50.png'
+          }
+        ]
+      })
+    )
+  })
+
+  it('throws when attachment upload returns an empty array', async () => {
+    mockedTrelloRequest.mockResolvedValueOnce([])
+
+    await expect(
+      uploadCardAttachment({
+        cardId: 'card-1',
+        name: 'file.png',
+        mimeType: 'image/png',
+        contentBase64: 'AQID'
+      })
+    ).rejects.toThrow('Trello attachment upload returned no attachments')
   })
 })

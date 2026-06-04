@@ -124,6 +124,49 @@ function installClipboardImageBase64(contentBase64: string): void {
   })
 }
 
+describe('web settings preload API', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('adds Trello to legacy visible task providers when the migration flag is absent', async () => {
+    const { api, storage } = await installApi('Linux')
+    storage.setItem(
+      'orca.web.settings.v1',
+      JSON.stringify({
+        visibleTaskProviders: ['gitlab'],
+        visibleTaskProvidersDefaultedForJira: true
+      })
+    )
+
+    const settings = await api.settings.get()
+
+    expect(settings.visibleTaskProviders).toEqual(['gitlab', 'trello'])
+    expect(settings.visibleTaskProvidersDefaultedForTrello).toBe(true)
+  })
+
+  it('preserves deliberate Trello opt-out when the migration flag is already set', async () => {
+    const { api, storage } = await installApi('Linux')
+    storage.setItem(
+      'orca.web.settings.v1',
+      JSON.stringify({
+        visibleTaskProviders: ['gitlab'],
+        visibleTaskProvidersDefaultedForJira: true,
+        visibleTaskProvidersDefaultedForTrello: true
+      })
+    )
+
+    const settings = await api.settings.get()
+
+    expect(settings.visibleTaskProviders).toEqual(['gitlab'])
+    expect(settings.visibleTaskProvidersDefaultedForTrello).toBe(true)
+  })
+})
+
 describe('web keybindings preload API', () => {
   beforeEach(() => {
     vi.resetModules()

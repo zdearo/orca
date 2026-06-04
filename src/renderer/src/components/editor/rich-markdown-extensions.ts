@@ -28,6 +28,20 @@ import { createRichMarkdownAnnotationHighlightExtension } from './rich-markdown-
 
 const lowlight = createLowlight(common)
 export type RichMarkdownImageSrcResolver = (src: string) => Promise<string | null | undefined>
+const resolverChangeListeners = new Set<() => void>()
+
+export function notifyRichMarkdownImageResolverChanged(): void {
+  for (const listener of resolverChangeListeners) {
+    listener()
+  }
+}
+
+function onImageResolverChanged(listener: () => void): () => void {
+  resolverChangeListeners.add(listener)
+  return () => {
+    resolverChangeListeners.delete(listener)
+  }
+}
 
 export function createRichMarkdownExtensions({
   includePlaceholder = false,
@@ -141,7 +155,10 @@ export function createRichMarkdownExtensions({
           // Why: when the user refocuses the window after deleting or replacing
           // image files, the blob URL cache is cleared and this callback re-loads
           // the image from disk so the editor reflects the current filesystem state.
-          const unsubscribe = onImageCacheInvalidated(() => {
+          const unsubscribeLocalCache = onImageCacheInvalidated(() => {
+            loadImage(currentSrc)
+          })
+          const unsubscribeResolver = onImageResolverChanged(() => {
             loadImage(currentSrc)
           })
 
@@ -154,12 +171,16 @@ export function createRichMarkdownExtensions({
               const newSrc = updatedNode.attrs.src as string | undefined
               if (newSrc !== currentSrc) {
                 currentSrc = newSrc
-                loadImage(newSrc)
               }
+              // Why: resolver identity can change while the markdown src stays the
+              // same (Trello account/runtime switch). Re-load on node updates so
+              // the ref-backed resolver can supply the current authenticated URL.
+              loadImage(newSrc)
               return true
             },
             destroy: () => {
-              unsubscribe()
+              unsubscribeLocalCache()
+              unsubscribeResolver()
             }
           }
         }

@@ -71,6 +71,7 @@ import {
   type FeatureInteractionState
 } from '../../../shared/feature-interactions'
 import { normalizeContextualTourIds, type ContextualTourId } from '../../../shared/contextual-tours'
+import { normalizeTaskProviderSettings } from '../../../shared/task-providers'
 
 const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
 const UI_STORAGE_KEY = 'orca.web.ui.v1'
@@ -2318,7 +2319,8 @@ function getStoredSettings(): GlobalSettings {
       rightSidebarOpenByDefault: false,
       activeRuntimeEnvironmentId: environment?.id ?? null
     },
-    stored
+    stored,
+    { migrateTrelloProviderDefault: true }
   )
 }
 
@@ -2435,12 +2437,52 @@ function mergeContextualTourSeenIds(
   }
   return [...merged]
 }
+function mergeTaskProviderSettings(
+  base: GlobalSettings,
+  updates: Partial<GlobalSettings>,
+  options?: { migrateTrelloProviderDefault?: boolean }
+): Pick<
+  GlobalSettings,
+  'visibleTaskProviders' | 'defaultTaskSource' | 'visibleTaskProvidersDefaultedForTrello'
+> {
+  const raw = normalizeTaskProviderSettings({
+    visibleTaskProviders: updates.visibleTaskProviders ?? base.visibleTaskProviders,
+    defaultTaskSource:
+      options?.migrateTrelloProviderDefault === true
+        ? updates.defaultTaskSource
+        : (updates.defaultTaskSource ?? base.defaultTaskSource)
+  })
+  const trelloDefaulted =
+    options?.migrateTrelloProviderDefault === true
+      ? updates.visibleTaskProvidersDefaultedForTrello === true
+      : updates.visibleTaskProvidersDefaultedForTrello === true ||
+        base.visibleTaskProvidersDefaultedForTrello === true
+  const visibleTaskProviders =
+    trelloDefaulted || raw.visibleTaskProviders.includes('trello')
+      ? raw.visibleTaskProviders
+      : [...raw.visibleTaskProviders, 'trello' as const]
+  const normalized = normalizeTaskProviderSettings({
+    visibleTaskProviders,
+    defaultTaskSource: raw.defaultTaskSource
+  })
+  return {
+    visibleTaskProviders: normalized.visibleTaskProviders,
+    defaultTaskSource: normalized.defaultTaskSource,
+    visibleTaskProvidersDefaultedForTrello: true
+  }
+}
 
-function mergeSettings(base: GlobalSettings, updates: Partial<GlobalSettings>): GlobalSettings {
+function mergeSettings(
+  base: GlobalSettings,
+  updates: Partial<GlobalSettings>,
+  options?: { migrateTrelloProviderDefault?: boolean }
+): GlobalSettings {
   const defaults = getDefaultSettings('~')
+  const taskProviders = mergeTaskProviderSettings(base, updates, options)
   return {
     ...base,
     ...updates,
+    ...taskProviders,
     notifications: {
       ...base.notifications,
       ...updates.notifications

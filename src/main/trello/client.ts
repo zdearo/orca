@@ -138,8 +138,10 @@ export async function trelloRequest<T>(path: string, init?: RequestInit): Promis
   })
   if (!response.ok) {
     const error = new TrelloApiError(await readTrelloError(response), response.status)
-    // Only clear credentials on confirmed auth errors.
-    if (error.status === 401 || error.status === 403) {
+    // Only clear credentials on 401 (token-invalid / unauthenticated).  403
+    // indicates a scope or resource permission issue that should not revoke
+    // stored credentials.
+    if (error.status === 401) {
       deleteTrelloCredentials()
     }
     throw error
@@ -203,12 +205,18 @@ async function downloadTrelloAttachment(
   token: string
 ): Promise<Response> {
   const url = new URL(urlString)
+  if (url.protocol !== 'https:') {
+    throw new TrelloApiError('Attachment URL must use HTTPS.', 400)
+  }
+  // Only allow fetching from Trello-hosted domains.  Rejecting attachment URLs
+  // that point to arbitrary hosts prevents SSRF via Trello attachment metadata.
+  if (!isTrelloDownloadHost(url.hostname)) {
+    throw new TrelloApiError('Attachment URL is not hosted on Trello.', 400)
+  }
   const headers: Record<string, string> = {
     Accept: 'image/*,application/octet-stream'
   }
-  if (isTrelloDownloadHost(url.hostname)) {
-    headers.Authorization = trelloAuthorizationHeader(apiKey, token)
-  }
+  headers.Authorization = trelloAuthorizationHeader(apiKey, token)
   return fetch(url.toString(), {
     redirect: 'follow',
     headers
@@ -233,18 +241,24 @@ export async function trelloDownload(urlString: string): Promise<{
   if (!url.pathname.startsWith('/1/cards/') || !url.pathname.includes('/download/')) {
     throw new TrelloApiError('Unsupported Trello image URL.', 400)
   }
-  const downloadUrl = await getTrelloAttachmentDownloadUrl(url)
-  const response = await downloadTrelloAttachment(downloadUrl, apiKey, token)
-  if (!response.ok) {
-    const error = new TrelloApiError(await readTrelloError(response), response.status)
-    if (error.status === 401 || error.status === 403) {
-      deleteTrelloCredentials()
+
+  await acquire()
+  try {
+    const downloadUrl = await getTrelloAttachmentDownloadUrl(url)
+    const response = await downloadTrelloAttachment(downloadUrl, apiKey, token)
+    if (!response.ok) {
+      const error = new TrelloApiError(await readTrelloError(response), response.status)
+      if (error.status === 401) {
+        deleteTrelloCredentials()
+      }
+      throw error
     }
-    throw error
-  }
-  return {
-    contentType: response.headers.get('content-type') || 'application/octet-stream',
-    contentBase64: Buffer.from(await response.arrayBuffer()).toString('base64')
+    return {
+      contentType: response.headers.get('content-type') || 'application/octet-stream',
+      contentBase64: Buffer.from(await response.arrayBuffer()).toString('base64')
+    }
+  } finally {
+    release()
   }
 }
 

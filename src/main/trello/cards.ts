@@ -71,8 +71,8 @@ export async function listBoardLabels(boardId: string): Promise<TrelloLabel[]> {
 }
 
 const CARD_FIELDS =
-  'name,desc,url,shortUrl,shortLink,closed,dueComplete,due,idBoard,idList,labels,members,dateLastActivity,shortId'
-const CARD_CONTEXT_FIELDS = `fields=${CARD_FIELDS}&board=true&board_fields=name,url,shortUrl&list=true&list_fields=name`
+  'name,desc,url,shortUrl,shortLink,closed,dueComplete,due,idBoard,idList,labels,members,dateLastActivity,idShort'
+const CARD_CONTEXT_FIELDS = `fields=${CARD_FIELDS}&board=true&board_fields=name,url,shortUrl&list=true&list_fields=name&member_fields=username,fullName,avatarUrl`
 
 export async function listCards(
   filter: TrelloCardFilter = 'assigned',
@@ -114,7 +114,7 @@ export async function searchCards(
 ): Promise<TrelloCard[]> {
   await acquire()
   try {
-    let path = `/search?query=${encodeURIComponent(query)}&modelTypes=cards&cards_limit=${limit}&card_fields=${CARD_FIELDS}&cards_board=true&cards_list=true`
+    let path = `/search?query=${encodeURIComponent(query)}&modelTypes=cards&cards_limit=${limit}&card_fields=${CARD_FIELDS}&cards_board=true&cards_list=true&cards_member_fields=username,fullName,avatarUrl`
     if (boardIds && boardIds.length > 0) {
       path += `&idBoards=${boardIds.join(',')}`
     }
@@ -169,14 +169,17 @@ export async function uploadCardAttachment(
     form.set('file', new Blob([content], { type: args.mimeType }), args.name)
     form.set('name', args.name)
     form.set('mimeType', args.mimeType)
-    const data = await trelloRequest<Record<string, unknown>>(
+    const data = await trelloRequest<Record<string, unknown>[]>(
       `/cards/${encodeURIComponent(args.cardId)}/attachments`,
       {
         method: 'POST',
         body: form
       }
     )
-    return mapTrelloAttachment(data)
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Trello attachment upload returned no attachments')
+    }
+    return mapTrelloAttachment(data[0])
   } finally {
     release()
   }

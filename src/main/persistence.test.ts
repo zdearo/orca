@@ -2055,6 +2055,15 @@ describe('Store', () => {
     expect(updated.comment).toBe('updated')
   })
 
+  it('preserves linked Trello card metadata after reload', async () => {
+    const store = await createStore()
+    store.setWorktreeMeta('wt1', { displayName: 'Trello work', linkedTrelloCard: 'abc123' })
+    store.flush()
+
+    const reloaded = await createStore()
+    expect(reloaded.getWorktreeMeta('wt1')?.linkedTrelloCard).toBe('abc123')
+  })
+
   // ── 9. Settings: get/update ────────────────────────────────────────
 
   it('updateSettings merges partial updates', async () => {

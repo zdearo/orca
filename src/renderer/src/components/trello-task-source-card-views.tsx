@@ -259,6 +259,13 @@ function TrelloListCard({
       onClick={() => onSelectCard(card)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
+          const target = event.target as HTMLElement
+          const interactiveTarget = target.closest(
+            'button, a, input, select, textarea, [role="button"], [role="menuitem"], [role="link"], [role="menuitemradio"], [role="option"]'
+          )
+          if (interactiveTarget && interactiveTarget !== event.currentTarget) {
+            return
+          }
           event.preventDefault()
           onSelectCard(card)
         }

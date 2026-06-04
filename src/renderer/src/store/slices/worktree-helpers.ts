@@ -105,6 +105,7 @@ export type WorktreeSlice = {
     workspaceStatus?: WorkspaceStatus,
     linkedGitLabMR?: number,
     linkedGitLabIssue?: number,
+    linkedTrelloCard?: string,
     startup?: WorktreeStartupLaunch,
     pendingFirstAgentMessageRename?: boolean
   ) => Promise<CreateWorktreeResult>

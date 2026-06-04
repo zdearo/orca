@@ -20,6 +20,7 @@ import {
 
 import {
   createRichMarkdownExtensions,
+  notifyRichMarkdownImageResolverChanged,
   type RichMarkdownImageSrcResolver
 } from '@/components/editor/rich-markdown-extensions'
 import { encodeRawMarkdownHtmlForRichEditor } from '@/components/editor/raw-markdown-html'
@@ -247,14 +248,24 @@ export function LinearIssueMarkdownDescriptionEditor({
   const lastEditorMarkdownRef = useRef(value)
   const editorRef = useRef<Editor | null>(null)
 
+  // Why: the image nodeviews capture the resolver at extension-creation time.
+  // A ref-backed stable resolver lets every node view reach the latest resolver
+  // without recreating the editor (which would lose unsaved edits).
+  const resolverRef = useRef(resolveImageSrc)
+  resolverRef.current = resolveImageSrc
+  const stableResolver = useMemo<RichMarkdownImageSrcResolver>(
+    () => (src) => resolverRef.current?.(src) ?? Promise.resolve(undefined),
+    []
+  )
+
   const extensions = useMemo(
     () => [
-      ...createRichMarkdownExtensions({ resolveImageSrc }),
+      ...createRichMarkdownExtensions({ resolveImageSrc: stableResolver }),
       Placeholder.configure({
         placeholder: 'No description provided.'
       })
     ],
-    [resolveImageSrc]
+    [stableResolver]
   )
 
   const editor = useEditor({
@@ -302,6 +313,24 @@ export function LinearIssueMarkdownDescriptionEditor({
   useEffect(() => {
     editor?.setEditable(!disabled)
   }, [disabled, editor])
+  // Why: when the image resolver identity changes (runtime/account switch),
+  // existing node views still hold stale blob URLs. Re-parsing with the same
+  // markdown content triggers every image node view to re-resolve through the
+  // ref-backed resolver, picking up the new identity. emitUpdate: false
+  // prevents the reparse from triggering onChange/onSave callbacks.
+  const prevResolverRef = useRef(resolveImageSrc)
+  useEffect(() => {
+    if (!editor || prevResolverRef.current === resolveImageSrc) {
+      return
+    }
+    prevResolverRef.current = resolveImageSrc
+    const currentMarkdown = editor.getMarkdown()
+    editor.commands.setContent(encodeRawMarkdownHtmlForRichEditor(currentMarkdown), {
+      contentType: 'markdown',
+      emitUpdate: false
+    })
+    notifyRichMarkdownImageResolverChanged()
+  }, [editor, resolveImageSrc])
 
   useEffect(() => {
     if (!editor || value === lastEditorMarkdownRef.current) {

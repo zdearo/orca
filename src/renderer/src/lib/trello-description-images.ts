@@ -45,7 +45,7 @@ export async function prepareTrelloDescriptionForSave({
   for (let index = 0; index < matches.length; index += 1) {
     const match = matches[index]
     const fullMatch = match[0]
-    const altText = match[1] || `image-${index + 1}`
+    const altText = match[1]
     const mimeType = match[3]
     const contentBase64 = match[4]
     const upload = await trelloUploadAttachment(settings, {

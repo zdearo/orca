@@ -96,7 +96,7 @@ export function mapTrelloCard(data: Record<string, unknown>): TrelloCard {
   const list = nestedRecord(data.list)
   return {
     id: toStringOrEmpty(data.id),
-    shortId: toStringOrEmpty(data.shortId),
+    shortId: String(data.idShort ?? ''),
     shortLink: toStringOrEmpty(data.shortLink),
     name: toStringOrEmpty(data.name),
     desc: toStringOrEmpty(data.desc),

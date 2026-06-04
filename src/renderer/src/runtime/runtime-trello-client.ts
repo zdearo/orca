@@ -16,12 +16,15 @@ import type {
   TrelloViewer
 } from '../../../shared/types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
+import {
+  downloadTrelloImageThroughRuntime,
+  uploadTrelloAttachmentThroughRuntime
+} from './runtime-trello-chunked-transfer'
 
 export type RuntimeTrelloSettings =
   | Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
   | null
   | undefined
-
 export type TrelloConnectResult = { ok: true; viewer: TrelloViewer } | { ok: false; error: string }
 export type TrelloCommentResult = { ok: true; id: string } | { ok: false; error: string }
 
@@ -217,14 +220,10 @@ export async function trelloUploadAttachment(
   args: TrelloUploadAttachmentArgs
 ): Promise<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }> {
   const target = getActiveRuntimeTarget(settings)
-  return target.kind === 'environment'
-    ? callRuntimeRpc<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }>(
-        target,
-        'trello.uploadAttachment',
-        args,
-        { timeoutMs: 60_000 }
-      )
-    : window.api.trello.uploadAttachment(args)
+  if (target.kind !== 'environment') {
+    return window.api.trello.uploadAttachment(args)
+  }
+  return uploadTrelloAttachmentThroughRuntime(target, args)
 }
 
 export async function trelloDownloadImage(
@@ -232,12 +231,8 @@ export async function trelloDownloadImage(
   url: string
 ): Promise<TrelloImageDownloadResult> {
   const target = getActiveRuntimeTarget(settings)
-  return target.kind === 'environment'
-    ? callRuntimeRpc<TrelloImageDownloadResult>(
-        target,
-        'trello.downloadImage',
-        { url },
-        { timeoutMs: 30_000 }
-      )
-    : window.api.trello.downloadImage({ url })
+  if (target.kind !== 'environment') {
+    return window.api.trello.downloadImage({ url })
+  }
+  return downloadTrelloImageThroughRuntime(target, url)
 }

@@ -1,76 +1,34 @@
-import { z } from 'zod'
 import type { RpcMethod } from '../core'
 import { defineMethod } from '../core'
 import {
-  OptionalFiniteNumber,
-  OptionalPlainString,
-  OptionalString,
-  requiredString
-} from '../schemas'
-
-const VALID_FILTERS = ['assigned', 'allOpen', 'archived'] as const
-
-const Connect = z.object({
-  apiKey: requiredString('API key is required'),
-  token: requiredString('Token is required')
-})
-
-const BoardId = z.object({
-  boardId: requiredString('Board ID is required')
-})
-
-const CardId = z.object({
-  cardId: requiredString('Card ID is required')
-})
-
-const ImageUrl = z.object({
-  url: requiredString('Image URL is required')
-})
-
-const UploadAttachment = z.object({
-  cardId: requiredString('Card ID is required'),
-  name: requiredString('Attachment name is required'),
-  mimeType: requiredString('Attachment MIME type is required'),
-  contentBase64: requiredString('Attachment content is required')
-})
-
-const ListCards = z
-  .object({
-    filter: z.enum(VALID_FILTERS).optional(),
-    limit: OptionalFiniteNumber,
-    boardIds: z.array(z.string()).optional()
-  })
-  .optional()
-
-const SearchCards = z.object({
-  query: requiredString('Missing search query'),
-  limit: OptionalFiniteNumber,
-  boardIds: z.array(z.string()).optional()
-})
-
-const CreateCard = z.object({
-  idBoard: requiredString('Board is required'),
-  idList: requiredString('List is required'),
-  name: requiredString('Title is required'),
-  desc: OptionalPlainString
-})
-
-const UpdateCard = z.object({
-  cardId: requiredString('Card ID is required'),
-  updates: z.object({
-    name: OptionalString,
-    desc: OptionalString,
-    idList: z.union([z.string(), z.null()]).optional(),
-    closed: z.boolean().optional(),
-    idMembers: z.array(z.string()).optional(),
-    idLabels: z.array(z.string()).optional()
-  })
-})
-
-const CardComment = z.object({
-  cardId: requiredString('Card ID is required'),
-  text: requiredString('Comment text is required')
-})
+  AbortDownload,
+  AbortUpload,
+  AppendUploadChunk,
+  BoardId,
+  CardComment,
+  CardId,
+  CommitUpload,
+  Connect,
+  CreateCard,
+  ImageUrl,
+  ListCards,
+  ReadDownloadChunk,
+  SearchCards,
+  StartDownload,
+  StartUpload,
+  UpdateCard,
+  UploadAttachment
+} from './trello-method-schemas'
+import {
+  appendTrelloUploadSessionChunk,
+  deleteTrelloDownloadSession,
+  deleteTrelloUploadSession,
+  getCommittedTrelloUpload,
+  pruneExpiredDownloadSessions,
+  readTrelloDownloadSessionChunk,
+  startTrelloDownloadSession,
+  startTrelloUploadSession
+} from './trello-transfer-sessions'
 
 export const TRELLO_METHODS: RpcMethod[] = [
   defineMethod({
@@ -169,13 +127,77 @@ export const TRELLO_METHODS: RpcMethod[] = [
       runtime.trelloUploadAttachment({
         cardId: params.cardId.trim(),
         name: params.name.trim(),
-        mimeType: params.mimeType.trim(),
-        contentBase64: params.contentBase64.trim()
+        mimeType: params.mimeType,
+        contentBase64: params.contentBase64
       })
   }),
   defineMethod({
     name: 'trello.downloadImage',
     params: ImageUrl,
     handler: async (params, { runtime }) => runtime.trelloDownloadImage(params.url.trim())
+  }),
+  // ── Chunked upload transfer ──
+  defineMethod({
+    name: 'trello.startUpload',
+    params: StartUpload,
+    handler: (params) =>
+      startTrelloUploadSession({
+        cardId: params.cardId,
+        name: params.name,
+        mimeType: params.mimeType,
+        expectedBase64Length: params.expectedBase64Length
+      })
+  }),
+  defineMethod({
+    name: 'trello.appendUploadChunk',
+    params: AppendUploadChunk,
+    handler: (params) => appendTrelloUploadSessionChunk(params)
+  }),
+  defineMethod({
+    name: 'trello.commitUpload',
+    params: CommitUpload,
+    handler: async (params, { runtime }) => {
+      try {
+        return await runtime.trelloUploadAttachment(getCommittedTrelloUpload(params.uploadId))
+      } finally {
+        deleteTrelloUploadSession(params.uploadId)
+      }
+    }
+  }),
+  defineMethod({
+    name: 'trello.abortUpload',
+    params: AbortUpload,
+    handler: (params) => {
+      deleteTrelloUploadSession(params.uploadId)
+      return { aborted: true }
+    }
+  }),
+  // ── Chunked download transfer ──
+  defineMethod({
+    name: 'trello.startDownload',
+    params: StartDownload,
+    handler: async (params, { runtime }) => {
+      pruneExpiredDownloadSessions()
+      const result = await runtime.trelloDownloadImage(params.url)
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      return startTrelloDownloadSession(result)
+    }
+  }),
+  defineMethod({
+    name: 'trello.readDownloadChunk',
+    params: ReadDownloadChunk,
+    handler: (params) => readTrelloDownloadSessionChunk(params)
+  }),
+  defineMethod({
+    name: 'trello.abortDownload',
+    params: AbortDownload,
+    handler: (params) => {
+      deleteTrelloDownloadSession(params.downloadId)
+      return { aborted: true }
+    }
   })
 ]
+
+export { resetTrelloTransferSessionsForTest } from './trello-transfer-sessions'

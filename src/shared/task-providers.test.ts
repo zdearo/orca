@@ -62,6 +62,15 @@ describe('task providers', () => {
     ).toEqual(['github', 'linear'])
   })
 
+  it('keeps Jira and Trello available as first-time connection entry points', () => {
+    expect(
+      filterAvailableTaskProviders(['jira', 'trello'], {
+        gitlabInstalled: false,
+        linearConnected: false
+      })
+    ).toEqual(['jira', 'trello'])
+  })
+
   it('keeps an available saved default visible when provider visibility drifted', () => {
     expect(
       restoreAvailableDefaultTaskProvider(

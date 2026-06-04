@@ -8,6 +8,7 @@ import type { GlobalSettings } from '../../../../shared/types'
 import { getTaskPresetQuery, PER_REPO_FETCH_LIMIT } from '@/lib/new-workspace'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
+import { TrelloIcon } from '@/components/icons/TrelloIcon'
 import {
   normalizeVisibleTaskProviders,
   restoreAvailableDefaultTaskProvider,
@@ -243,6 +244,23 @@ const SidebarNav = React.memo(function SidebarNav() {
                 aria-label="Open Jira tasks"
               >
                 <JiraIcon className="size-3.5" />
+              </span>
+            ) : null}
+            {visibleTaskProviders.includes('trello') ? (
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!canBrowseTasks) {
+                    return
+                  }
+                  openTaskPage({ taskSource: 'trello' })
+                }}
+                className="rounded p-0.5 text-muted-foreground/70 transition-colors hover:text-foreground"
+                aria-label="Open Trello tasks"
+              >
+                <TrelloIcon className="size-3.5" />
               </span>
             ) : null}
           </span>

@@ -55,4 +55,35 @@ describe('prepareTrelloDescriptionForSave', () => {
 
     expect(mockedUploadAttachment).not.toHaveBeenCalled()
   })
+  it('preserves empty alt text when uploading data URL images', async () => {
+    mockedUploadAttachment.mockResolvedValueOnce({
+      ok: true,
+      attachment: {
+        id: 'att-2',
+        name: 'image-1.png',
+        fileName: 'image-1.png',
+        mimeType: 'image/png',
+        url: 'https://trello.com/1/cards/card-1/attachments/att-2/download/image-1.png'
+      }
+    })
+    const settings = { activeRuntimeEnvironmentId: null }
+
+    await expect(
+      prepareTrelloDescriptionForSave({
+        cardId: 'card-1',
+        description: 'Before\n\n![](data:image/png;base64,iVBORw==)\n\nAfter',
+        settings: settings as never
+      })
+    ).resolves.toBe(
+      'Before\n\n![](https://trello.com/1/cards/card-1/attachments/att-2/download/image-1.png)\n\nAfter'
+    )
+
+    // Alt text stays empty — the filename fallback is used only for the upload name.
+    expect(mockedUploadAttachment).toHaveBeenCalledWith(settings, {
+      cardId: 'card-1',
+      name: 'image-1.png',
+      mimeType: 'image/png',
+      contentBase64: 'iVBORw=='
+    })
+  })
 })

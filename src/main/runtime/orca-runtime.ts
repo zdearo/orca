@@ -13109,6 +13109,13 @@ export class OrcaRuntimeService {
   async trelloUploadAttachment(
     args: TrelloUploadAttachmentArgs
   ): Promise<{ ok: true; attachment: TrelloAttachment } | { ok: false; error: string }> {
+    const VALID_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const
+    if (!(VALID_MIME_TYPES as readonly string[]).includes(args.mimeType)) {
+      return {
+        ok: false,
+        error: `Unsupported MIME type: ${args.mimeType}. Allowed: image/png, image/jpeg, image/gif, image/webp`
+      }
+    }
     try {
       const attachment = await uploadTrelloCardAttachment(args)
       return { ok: true, attachment }

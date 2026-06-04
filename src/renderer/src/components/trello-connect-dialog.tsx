@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ExternalLink, LoaderCircle, Lock } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
@@ -34,6 +34,7 @@ export function TrelloConnectDialog({
   const [token, setToken] = useState('')
   const [phase, setPhase] = useState<'idle' | 'connecting' | 'testing'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const attemptIdRef = useRef(0)
 
   const resetState = (): void => {
     setApiKey('')
@@ -44,6 +45,7 @@ export function TrelloConnectDialog({
 
   const handleOpenChange = (next: boolean): void => {
     if (!next) {
+      ++attemptIdRef.current
       resetState()
     }
     onOpenChange(next)
@@ -66,16 +68,20 @@ export function TrelloConnectDialog({
     window.api.shell.openUrl(`https://trello.com/1/authorize?${params.toString()}`)
   }
 
+  const isCurrentAttempt = (attemptId: number): boolean =>
+    mountedRef.current && attemptId === attemptIdRef.current
+
   const handleConnect = async (): Promise<void> => {
     if (!apiKey.trim() || !token.trim()) {
       setError('API key and token are required.')
       return
     }
+    const attemptId = ++attemptIdRef.current
     setPhase('connecting')
     setError(null)
     try {
       const result = await connectTrello({ apiKey: apiKey.trim(), token: token.trim() })
-      if (!mountedRef.current) {
+      if (!isCurrentAttempt(attemptId)) {
         return
       }
       if (!result.ok) {
@@ -85,7 +91,7 @@ export function TrelloConnectDialog({
       }
       setPhase('testing')
       const testResult = await testTrelloConnection()
-      if (!mountedRef.current) {
+      if (!isCurrentAttempt(attemptId)) {
         return
       }
       if (!testResult.ok) {
@@ -96,14 +102,13 @@ export function TrelloConnectDialog({
       onConnected?.()
       handleOpenChange(false)
     } catch (err) {
-      if (!mountedRef.current) {
+      if (!isCurrentAttempt(attemptId)) {
         return
       }
       setPhase('idle')
       setError(err instanceof Error ? err.message : 'Connection failed.')
     }
   }
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[420px]">

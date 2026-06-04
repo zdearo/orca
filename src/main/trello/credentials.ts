@@ -104,9 +104,6 @@ export function loadTrelloToken(): string | null {
 
 export function saveTrelloCredentials(apiKey: string, token: string, viewer: TrelloViewer): void {
   ensureOrcaDir()
-  cachedToken = token
-  cachedMetadata = { apiKey, viewer, hasToken: true }
-  metadataLoaded = true
 
   const toWrite: StoredTrelloCredentials = {
     version: 1,
@@ -120,10 +117,16 @@ export function saveTrelloCredentials(apiKey: string, token: string, viewer: Tre
     toWrite.token = token
   }
 
+  // Persist first; only update in-memory cache after successful write so a
+  // failure leaves the previous credential state intact.
   writeFileSync(getCredentialsPath(), JSON.stringify(toWrite, null, 2), {
     encoding: 'utf-8',
     mode: 0o600
   })
+
+  cachedToken = token
+  cachedMetadata = { apiKey, viewer, hasToken: true }
+  metadataLoaded = true
 }
 
 export function updateTrelloViewer(viewer: TrelloViewer): void {

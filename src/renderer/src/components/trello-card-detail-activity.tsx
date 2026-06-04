@@ -11,6 +11,7 @@ type TrelloCardDetailActivityProps = {
   commentsLoading: boolean
   commentsError: string | null
   commentText: string
+  commentSubmitting: boolean
   onCommentTextChange: (value: string) => void
   onRetryComments: () => void
   onAddComment: () => void
@@ -22,6 +23,7 @@ export function TrelloCardDetailActivity({
   commentsLoading,
   commentsError,
   commentText,
+  commentSubmitting,
   onCommentTextChange,
   onRetryComments,
   onAddComment
@@ -121,7 +123,12 @@ export function TrelloCardDetailActivity({
             className="w-full resize-none border-none bg-transparent p-0 text-sm outline-none placeholder:text-muted-foreground/45 focus:outline-none focus:ring-0 focus-visible:ring-0"
           />
           <div className="mt-3 flex justify-end">
-            <Button size="sm" onClick={onAddComment} disabled={!commentText.trim()}>
+            <Button
+              size="sm"
+              onClick={onAddComment}
+              disabled={!commentText.trim() || commentSubmitting}
+            >
+              {commentSubmitting ? <LoaderCircle className="mr-1 size-3.5 animate-spin" /> : null}
               Add comment
             </Button>
           </div>

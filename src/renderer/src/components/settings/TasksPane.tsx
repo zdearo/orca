@@ -94,6 +94,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
             'gitlab',
             'linear',
             'jira',
+            'trello',
             'atlassian',
             'display',
             'hide'

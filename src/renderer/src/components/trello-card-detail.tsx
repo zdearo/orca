@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clipboard, ExternalLink, LoaderCircle } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type {
   TrelloCard,
-  TrelloComment,
   TrelloLabel,
   TrelloList,
   TrelloMember
 } from '../../../shared/trello-types'
-import { LinearIssueMarkdownDescriptionEditor } from '@/components/LinearIssueMarkdownDescriptionEditor'
-import { getScreenSubmitShortcutLabel } from '@/lib/screen-submit-shortcut'
 import { useAppStore } from '@/store'
 import { trelloUpdateCard } from '@/runtime/runtime-trello-client'
-import { Button } from '@/components/ui/button'
-import { TrelloCardDetailActivity } from '@/components/trello-card-detail-activity'
 import { TrelloCardDetailHeader } from '@/components/trello-card-detail-header'
-import type { TrelloCardDetailActionItem } from '@/components/trello-card-detail-sidebar'
+import { TrelloCardDetailMainColumn } from '@/components/trello-card-detail-main-column'
 import { TrelloCardDetailSidebar } from '@/components/trello-card-detail-sidebar'
+import {
+  copyTrelloCardDetailText,
+  createTrelloCardDetailActionItems
+} from '@/components/trello-card-detail-actions'
+import { loadTrelloCardDetailData } from '@/components/trello-card-detail-data'
+import { useTrelloCardDetailComments } from '@/components/trello-card-detail-comments'
+import { saveTrelloCardChanges } from '@/components/trello-card-detail-save'
 import { renderCardContext } from '@/components/trello-card-detail-text'
 import { createTrelloImageSrcResolver } from '@/lib/trello-authenticated-images'
 import { prepareTrelloDescriptionForSave } from '@/lib/trello-description-images'
@@ -28,16 +29,6 @@ type TrelloCardDetailProps = {
   onUse: (card: TrelloCard, renderedText?: string) => void
   backLabel?: string
 }
-
-async function copyTextToClipboard(text: string, label: string): Promise<void> {
-  try {
-    await window.api.ui.writeClipboardText(text)
-    toast.success(`${label} copied`)
-  } catch {
-    toast.error(`Failed to copy ${label.toLowerCase()}`)
-  }
-}
-
 export function TrelloCardDetail({
   card,
   onClose,
@@ -48,10 +39,8 @@ export function TrelloCardDetail({
   const settings = useAppStore((s) => s.settings)
   const fetchTrelloCard = useAppStore((s) => s.fetchTrelloCard)
   const fetchTrelloLists = useAppStore((s) => s.fetchTrelloLists)
-  const fetchTrelloComments = useAppStore((s) => s.fetchTrelloComments)
   const fetchTrelloBoardMembers = useAppStore((s) => s.fetchTrelloBoardMembers)
   const fetchTrelloBoardLabels = useAppStore((s) => s.fetchTrelloBoardLabels)
-  const addTrelloCardComment = useAppStore((s) => s.addTrelloCardComment)
   const patchTrelloCard = useAppStore((s) => s.patchTrelloCard)
 
   const [displayed, setDisplayed] = useState(card)
@@ -59,103 +48,139 @@ export function TrelloCardDetail({
   const [description, setDescription] = useState(card.desc)
   const [listId, setListId] = useState(card.idList)
   const [lists, setLists] = useState<TrelloList[]>([])
-  const [comments, setComments] = useState<TrelloComment[]>([])
   const [boardMembers, setBoardMembers] = useState<TrelloMember[]>([])
   const [boardLabels, setBoardLabels] = useState<TrelloLabel[]>([])
   const [loading, setLoading] = useState(false)
-  const [commentsLoading, setCommentsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [commentText, setCommentText] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [commentsError, setCommentsError] = useState<string | null>(null)
+  const dirtyFieldsRef = useRef({ title: false, description: false, listId: false })
+  const prevCardIdRef = useRef(card.id)
 
-  const resolveTrelloImageSrc = useMemo(() => createTrelloImageSrcResolver(settings), [settings])
+  const trelloStatus = useAppStore((s) => s.trelloStatus)
+  const resolveTrelloImageSrc = useMemo(
+    () =>
+      createTrelloImageSrcResolver(settings, {
+        runtimeEnvironmentId: settings?.activeRuntimeEnvironmentId,
+        accountId: trelloStatus.viewer?.username
+      }),
+    [settings, trelloStatus.viewer?.username]
+  )
 
   const dirty = useMemo(
     () => title !== displayed.name || description !== displayed.desc || listId !== displayed.idList,
     [description, displayed.desc, displayed.idList, displayed.name, listId, title]
   )
 
+  const applyFreshCard = useCallback(
+    (nextCard: TrelloCard, options?: { notifyParent?: boolean }): void => {
+      setDisplayed(nextCard)
+      if (!dirtyFieldsRef.current.title) {
+        setTitle(nextCard.name)
+      }
+      if (!dirtyFieldsRef.current.description) {
+        setDescription(nextCard.desc)
+      }
+      if (!dirtyFieldsRef.current.listId) {
+        setListId(nextCard.idList)
+      }
+      patchTrelloCard(nextCard.id, nextCard)
+      if (options?.notifyParent === true) {
+        onUpdated(nextCard)
+      }
+    },
+    [onUpdated, patchTrelloCard]
+  )
+
+  const applyUpdatedCard = useCallback(
+    (updated: TrelloCard): void => {
+      dirtyFieldsRef.current = { title: false, description: false, listId: false }
+      setDisplayed(updated)
+      setTitle(updated.name)
+      setDescription(updated.desc)
+      setListId(updated.idList)
+      patchTrelloCard(updated.id, updated)
+      onUpdated(updated)
+    },
+    [onUpdated, patchTrelloCard]
+  )
+
   const loadDetails = useCallback(async (): Promise<void> => {
     setLoading(true)
     setError(null)
     try {
-      const [fullCard, nextLists, nextMembers, nextLabels] = await Promise.all([
-        fetchTrelloCard(card.id),
-        fetchTrelloLists(card.idBoard),
-        fetchTrelloBoardMembers(card.idBoard),
-        fetchTrelloBoardLabels(card.idBoard)
-      ])
-      const nextCard = fullCard ?? card
-      setDisplayed(nextCard)
-      setTitle(nextCard.name)
-      setDescription(nextCard.desc)
-      setListId(nextCard.idList)
-      setLists(nextLists.filter((list) => !list.closed || list.id === nextCard.idList))
-      setBoardMembers(nextMembers)
-      setBoardLabels(nextLabels)
+      const nextData = await loadTrelloCardDetailData({
+        card,
+        fetchTrelloCard,
+        fetchTrelloLists,
+        fetchTrelloBoardMembers,
+        fetchTrelloBoardLabels
+      })
+      applyFreshCard(nextData.card)
+      setLists(nextData.lists)
+      setBoardMembers(nextData.boardMembers)
+      setBoardLabels(nextData.boardLabels)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load Trello card.')
     } finally {
       setLoading(false)
     }
-  }, [card, fetchTrelloBoardLabels, fetchTrelloBoardMembers, fetchTrelloCard, fetchTrelloLists])
+  }, [
+    applyFreshCard,
+    card,
+    fetchTrelloBoardLabels,
+    fetchTrelloBoardMembers,
+    fetchTrelloCard,
+    fetchTrelloLists
+  ])
 
-  const loadComments = useCallback(
-    async (options?: { force?: boolean }): Promise<void> => {
-      setCommentsLoading(true)
-      setCommentsError(null)
-      try {
-        setComments(await fetchTrelloComments(card.id, options))
-      } catch (err) {
-        setCommentsError(err instanceof Error ? err.message : 'Failed to load Trello comments.')
-      } finally {
-        setCommentsLoading(false)
-      }
-    },
-    [card.id, fetchTrelloComments]
-  )
+  const {
+    comments,
+    commentsLoading,
+    commentsError,
+    commentText,
+    commentSubmitting,
+    setCommentText,
+    loadComments,
+    addComment
+  } = useTrelloCardDetailComments({ cardId: card.id, setError })
 
   useEffect(() => {
-    setDisplayed(card)
-    setTitle(card.name)
-    setDescription(card.desc)
-    setListId(card.idList)
+    const cardIdChanged = card.id !== prevCardIdRef.current
+    if (cardIdChanged) {
+      prevCardIdRef.current = card.id
+      dirtyFieldsRef.current = { title: false, description: false, listId: false }
+      setDisplayed(card)
+      setTitle(card.name)
+      setDescription(card.desc)
+      setListId(card.idList)
+    } else {
+      setDisplayed(card)
+      if (!dirtyFieldsRef.current.title) {
+        setTitle(card.name)
+      }
+      if (!dirtyFieldsRef.current.description) {
+        setDescription(card.desc)
+      }
+      if (!dirtyFieldsRef.current.listId) {
+        setListId(card.idList)
+      }
+    }
     void loadDetails()
     void loadComments({ force: true })
   }, [card, loadComments, loadDetails])
-
-  const applyUpdatedCard = (updated: TrelloCard): void => {
-    setDisplayed(updated)
-    setTitle(updated.name)
-    setDescription(updated.desc)
-    setListId(updated.idList)
-    patchTrelloCard(updated.id, updated)
-    onUpdated(updated)
-  }
-
-  const saveCardChanges = async (nextDescription: string): Promise<TrelloCard | null> => {
-    const preparedDescription = await prepareTrelloDescriptionForSave({
-      cardId: displayed.id,
-      description: nextDescription,
-      settings
-    })
-    const updated = await trelloUpdateCard(settings, displayed.id, {
-      name: title.trim(),
-      desc: preparedDescription,
-      idList: listId
-    })
-    if (!updated.ok) {
-      throw new Error(updated.error)
-    }
-    return fetchTrelloCard(displayed.id)
-  }
 
   const handleSave = async (): Promise<void> => {
     setSaving(true)
     setError(null)
     try {
-      const updatedCard = await saveCardChanges(description)
+      const updatedCard = await saveTrelloCardChanges({
+        settings,
+        cardId: displayed.id,
+        title,
+        description,
+        listId,
+        fetchTrelloCard
+      })
       if (updatedCard) {
         applyUpdatedCard(updatedCard)
         toast.success('Trello card updated')
@@ -184,11 +209,12 @@ export function TrelloCardDetail({
         setError(result.error)
         return
       }
-      const updatedCard = await fetchTrelloCard(displayed.id)
+      dirtyFieldsRef.current.description = false
+      const updatedCard = await fetchTrelloCard(displayed.id, { force: true })
       if (updatedCard) {
-        applyUpdatedCard(updatedCard)
+        applyFreshCard(updatedCard)
       } else {
-        applyUpdatedCard({ ...displayed, desc: preparedDescription })
+        applyFreshCard({ ...displayed, desc: preparedDescription })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update Trello description.')
@@ -206,7 +232,11 @@ export function TrelloCardDetail({
         setError(result.error)
         return
       }
-      applyUpdatedCard({ ...displayed, closed: !displayed.closed })
+      applyFreshCard({ ...displayed, closed: !displayed.closed }, { notifyParent: true })
+      const fresh = await fetchTrelloCard(displayed.id, { force: true })
+      if (fresh) {
+        applyFreshCard(fresh, { notifyParent: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update archived state.')
     } finally {
@@ -216,6 +246,7 @@ export function TrelloCardDetail({
 
   const handleListChange = async (nextListId: string): Promise<void> => {
     setListId(nextListId)
+    dirtyFieldsRef.current.listId = true
     setSaving(true)
     setError(null)
     try {
@@ -224,11 +255,17 @@ export function TrelloCardDetail({
         setError(result.error)
         return
       }
-      applyUpdatedCard({
+      const optimistic = {
         ...displayed,
         idList: nextListId,
         listName: lists.find((list) => list.id === nextListId)?.name ?? displayed.listName
-      })
+      }
+      applyFreshCard(optimistic, { notifyParent: true })
+      dirtyFieldsRef.current.listId = false
+      const fresh = await fetchTrelloCard(displayed.id, { force: true })
+      if (fresh) {
+        applyFreshCard(fresh, { notifyParent: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update Trello list.')
     } finally {
@@ -249,10 +286,17 @@ export function TrelloCardDetail({
         setError(result.error)
         return
       }
-      applyUpdatedCard({
-        ...displayed,
-        members: boardMembers.filter((member) => nextIds.includes(member.id))
-      })
+      applyFreshCard(
+        {
+          ...displayed,
+          members: boardMembers.filter((member) => nextIds.includes(member.id))
+        },
+        { notifyParent: true }
+      )
+      const fresh = await fetchTrelloCard(displayed.id, { force: true })
+      if (fresh) {
+        applyFreshCard(fresh, { notifyParent: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update Trello members.')
     } finally {
@@ -273,10 +317,17 @@ export function TrelloCardDetail({
         setError(result.error)
         return
       }
-      applyUpdatedCard({
-        ...displayed,
-        labels: boardLabels.filter((label) => nextIds.includes(label.id))
-      })
+      applyFreshCard(
+        {
+          ...displayed,
+          labels: boardLabels.filter((label) => nextIds.includes(label.id))
+        },
+        { notifyParent: true }
+      )
+      const fresh = await fetchTrelloCard(displayed.id, { force: true })
+      if (fresh) {
+        applyFreshCard(fresh, { notifyParent: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update Trello labels.')
     } finally {
@@ -284,43 +335,8 @@ export function TrelloCardDetail({
     }
   }
 
-  const handleAddComment = async (): Promise<void> => {
-    const body = commentText.trim()
-    if (!body) {
-      return
-    }
-    const result = await addTrelloCardComment(displayed.id, body)
-    if (!result.ok) {
-      setError(result.error)
-      return
-    }
-    setCommentText('')
-    await loadComments({ force: true })
-  }
-
   const renderedContext = renderCardContext(displayed)
-  const actionItems: TrelloCardDetailActionItem[] = [
-    {
-      label: 'Copy URL',
-      icon: Clipboard,
-      action: () => void copyTextToClipboard(displayed.url, 'URL')
-    },
-    {
-      label: 'Copy short link',
-      icon: Clipboard,
-      action: () => void copyTextToClipboard(displayed.shortLink || displayed.id, 'Short link')
-    },
-    {
-      label: 'Copy prompt',
-      icon: Clipboard,
-      action: () => void copyTextToClipboard(renderedContext, 'Prompt')
-    },
-    {
-      label: 'Open in Trello',
-      icon: ExternalLink,
-      action: () => window.api.shell.openUrl(displayed.url)
-    }
-  ]
+  const actionItems = createTrelloCardDetailActionItems(displayed, renderedContext)
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border/50 bg-background shadow-sm">
@@ -329,65 +345,43 @@ export function TrelloCardDetail({
         loading={loading}
         backLabel={backLabel}
         onClose={onClose}
-        onCopyUrl={() => void copyTextToClipboard(displayed.url, 'URL')}
+        onCopyUrl={() => void copyTrelloCardDetailText(displayed.url, 'URL')}
         onCopyShortLink={() =>
-          void copyTextToClipboard(displayed.shortLink || displayed.id, 'Short link')
+          void copyTrelloCardDetailText(displayed.shortLink || displayed.id, 'Short link')
         }
         onStartWorkspace={() => onUse(displayed, renderedContext)}
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         <div className="mx-auto grid w-full grid-cols-1 gap-10 px-7 py-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-10 xl:px-12">
-          <main className="min-w-0">
-            {error ? (
-              <p className="mb-5 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {error}
-              </p>
-            ) : null}
-
-            <section className="space-y-5">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Card title"
-                className="w-full border-none bg-transparent p-0 text-3xl font-semibold leading-tight text-foreground outline-none placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0 focus-visible:ring-0"
-              />
-              <LinearIssueMarkdownDescriptionEditor
-                value={description}
-                onChange={setDescription}
-                onSave={(nextValue) => void handleDescriptionSave(nextValue)}
-                density="page"
-                disabled={saving}
-                submitShortcutLabel={getScreenSubmitShortcutLabel()}
-                resolveImageSrc={resolveTrelloImageSrc}
-              />
-              <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-4">
-                <Button size="sm" onClick={() => void handleSave()} disabled={!dirty || saving}>
-                  {saving ? <LoaderCircle className="mr-1 size-3.5 animate-spin" /> : null}
-                  Save changes
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleArchiveToggle()}
-                  disabled={saving}
-                >
-                  {displayed.closed ? 'Unarchive' : 'Archive'}
-                </Button>
-              </div>
-            </section>
-
-            <TrelloCardDetailActivity
-              card={displayed}
-              comments={comments}
-              commentsLoading={commentsLoading}
-              commentsError={commentsError}
-              commentText={commentText}
-              onCommentTextChange={setCommentText}
-              onRetryComments={() => void loadComments({ force: true })}
-              onAddComment={() => void handleAddComment()}
-            />
-          </main>
+          <TrelloCardDetailMainColumn
+            card={displayed}
+            title={title}
+            description={description}
+            dirty={dirty}
+            saving={saving}
+            error={error}
+            comments={comments}
+            commentsLoading={commentsLoading}
+            commentsError={commentsError}
+            commentText={commentText}
+            commentSubmitting={commentSubmitting}
+            resolveTrelloImageSrc={resolveTrelloImageSrc}
+            onTitleChange={(nextValue) => {
+              dirtyFieldsRef.current.title = nextValue !== displayed.name
+              setTitle(nextValue)
+            }}
+            onDescriptionChange={(value) => {
+              dirtyFieldsRef.current.description = value !== displayed.desc
+              setDescription(value)
+            }}
+            onDescriptionSave={(nextValue) => void handleDescriptionSave(nextValue)}
+            onSave={() => void handleSave()}
+            onArchiveToggle={() => void handleArchiveToggle()}
+            onCommentTextChange={setCommentText}
+            onRetryComments={() => void loadComments({ force: true })}
+            onAddComment={() => void addComment()}
+          />
 
           <TrelloCardDetailSidebar
             card={displayed}
